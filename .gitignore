@@ -166,3 +166,4 @@ cython_debug/
 data/
 archive/
 figures/
+results/

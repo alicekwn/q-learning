@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 find = {}
 
 [project]
-name = "qlearning_env"
+name = "qlearning"
 version = "0.0.1" 
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,7 +22,9 @@ dependencies = [
     "requests",
     "matplotlib",
     "seaborn",
-    "joblib"
+    "joblib",
+    "tqdm",
+    "streamlit"
 ]
 
 [project.optional-dependencies]
