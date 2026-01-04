@@ -69,7 +69,7 @@ pip install -e ".[dev]"
 After installation, run the interactive Q-learning demo:
 
 ```bash
-streamlit run streamlit_app/app.py
+streamlit run streamlit_app/Welcome.py
 ```
 
 The app will open in your browser at `http://localhost:8501`.
