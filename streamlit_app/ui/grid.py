@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-__all__ = ["render_grid", "render_grid_2d"]
+__all__ = ["render_grid_1d", "render_grid_2d"]
 
-def render_grid(start_pos: int, end_pos: int, current_state: int, goal_pos: int, path: list[int], show_path: bool = True, show_dog: bool = True) -> None:
+def render_grid_1d(start_pos: int, end_pos: int, current_state: int, goal_pos: int, path: list[int], show_path: bool = True, show_dog: bool = True) -> None:
     """Render 1D grid with emoji indicators and globally centered text.
     
     Args:

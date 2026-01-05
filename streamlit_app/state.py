@@ -33,7 +33,7 @@ __all__ = [
     "run_batch_training_2d",
 ]
 
-ACTIONS = ["L", "R"]
+ACTIONS_1D = ["L", "R"]
 ACTIONS_2D = ["U", "D", "L", "R"]
 ACTIONS_2D_DELTA = {
     "U": (0, 1),   # Up increases Y (Cartesian)
@@ -63,7 +63,7 @@ def init_session_state(config: dict) -> None:
     st.session_state[f"{tab_id}_agent"] = agent
     
     # Q-table as DataFrame for display compatibility (index uses actual position values)
-    st.session_state[f"{tab_id}_q_table"] = pd.DataFrame(0.0, index=states, columns=ACTIONS)
+    st.session_state[f"{tab_id}_q_table"] = pd.DataFrame(0.0, index=states, columns=ACTIONS_1D)
     
     # Episode tracking
     start_s = get_start_state(
@@ -131,7 +131,7 @@ def record_q_history(config: dict) -> None:
     q_table = st.session_state[f"{tab_id}_q_table"]
     snapshot = {}
     for s in q_table.index:
-        for a in ACTIONS:
+        for a in ACTIONS_1D:
             snapshot[f"Q({s},{a})"] = q_table.at[s, a]
     snapshot['Episode'] = st.session_state[f"{tab_id}_total_episodes"]
     st.session_state[f"{tab_id}_q_history_plot"].append(snapshot)
@@ -192,7 +192,7 @@ def step_agent(config: dict) -> None:
     
     # 1. Choose Action (Epsilon-Greedy)
     if np.random.rand() < epsilon:
-        action = np.random.choice(ACTIONS)
+        action = np.random.choice(ACTIONS_1D)
         decision_type = "Exploratory (Random)"
     else:
         current_q = q_df.loc[state]
@@ -297,7 +297,7 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
         while curr_s != goal_pos and steps < 100:
             # Epsilon-greedy
             if np.random.rand() < epsilon:
-                a = np.random.choice(ACTIONS)
+                a = np.random.choice(ACTIONS_1D)
             else:
                 qs = st.session_state[f"{tab_id}_q_table"].loc[curr_s]
                 max_q = qs.max()
@@ -431,6 +431,10 @@ def forward_checkpoint(config: dict) -> None:
         # At last checkpoint, jump to live
         st.session_state[f"{tab_id}_playback_index"] = -1
 
+def jump_to_start(config: dict) -> None:
+    """Jump to start of playback."""
+    tab_id = config.get("tab_id", "default")
+    st.session_state[f"{tab_id}_playback_index"] = 0
 
 def jump_to_latest(config: dict) -> None:
     """Jump back to live (latest) state."""
