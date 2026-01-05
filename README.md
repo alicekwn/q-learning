@@ -79,10 +79,10 @@ The app will open in your browser at `http://localhost:8501`.
 The core Q-learning logic is available as a reusable package. Import it in notebooks or scripts:
 
 ```python
-from qlearning import LineWorld, QLearningAgent
+from qlearning import LineGrid, RectangularGrid, QLearningAgent
 
 # Create environment
-env = LineWorld(states=list(range(8)), terminal_state=5, reward=1.0)
+env = LineGrid(states=list(range(8)), terminal_state=5, reward=1.0)
 
 # Create agent
 agent = QLearningAgent(env, alpha=0.7, gamma=0.9, epsilon=0.4)

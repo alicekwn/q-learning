@@ -1,6 +1,8 @@
 """Policy visualization using vector field diagrams."""
 from __future__ import annotations
 
+import math
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
@@ -13,6 +15,14 @@ ACTIONS_2D_VECTORS = {
     "D": (0, -1),  # Down: -Y
     "L": (-1, 0),  # Left: -X
     "R": (1, 0),   # Right: +X
+}
+
+# Diagonal arrow mapping for multiple optimal actions (normalized vectors)
+DIAGONAL_VECTORS = {
+    frozenset(["U", "R"]): (1, 1),    # Up-Right
+    frozenset(["U", "L"]): (-1, 1),   # Up-Left
+    frozenset(["D", "R"]): (1, -1),   # Down-Right
+    frozenset(["D", "L"]): (-1, -1),  # Down-Left
 }
 
 
@@ -138,8 +148,27 @@ def _create_policy_figure_2d(
                                    arrowprops=dict(arrowstyle="->", color="darkblue", lw=3,
                                                  mutation_scale=20))
                     else:
-                        # Multiple best actions - show dot
-                        ax.plot(x, y, "o", color="purple", markersize=8)
+                        # Multiple best actions - show diagonal arrow if applicable
+                        best_actions_set = frozenset(best_actions)
+                        diagonal_vector = DIAGONAL_VECTORS.get(best_actions_set)
+                        if diagonal_vector:
+                            # Draw diagonal arrow using annotate (same style as single arrows)
+                            dx, dy = diagonal_vector
+                            # Normalize diagonal vector to unit length for consistent arrow size
+                            norm = math.sqrt(dx**2 + dy**2)
+                            dx_norm = dx / norm
+                            dy_norm = dy / norm
+                            arrow_length = 0.3
+                            start_x = x - dx_norm * 0.2
+                            start_y = y - dy_norm * 0.2
+                            end_x = x + dx_norm * arrow_length
+                            end_y = y + dy_norm * arrow_length
+                            ax.annotate("", xy=(end_x, end_y), xytext=(start_x, start_y),
+                                       arrowprops=dict(arrowstyle="->", color="darkblue", lw=3,
+                                                     mutation_scale=20))
+                        else:
+                            # Fallback to dot for other combinations
+                            ax.plot(x, y, "o", color="purple", markersize=8)
     
     # Set axis properties
     ax.set_xlim(x_start - 0.6, x_end + 0.6)

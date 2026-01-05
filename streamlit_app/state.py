@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from qlearning import LineWorld, QLearningAgent
+from qlearning import LineGrid, RectangularGrid, QLearningAgent
 
 # Performance: Limit checkpoint history to prevent memory bloat
 MAX_CHECKPOINTS = 50
@@ -33,14 +33,7 @@ __all__ = [
     "run_batch_training_2d",
 ]
 
-ACTIONS_1D = ["L", "R"]
-ACTIONS_2D = ["U", "D", "L", "R"]
-ACTIONS_2D_DELTA = {
-    "U": (0, 1),   # Up increases Y (Cartesian)
-    "D": (0, -1),  # Down decreases Y (Cartesian)
-    "L": (-1, 0),  # Left decreases X
-    "R": (1, 0),   # Right increases X
-}
+ACTIONS_1D = ["L", "R"]  # Keep for backward compatibility with DataFrame columns
 
 
 def init_session_state(config: dict) -> None:
@@ -55,7 +48,7 @@ def init_session_state(config: dict) -> None:
     states = list(range(start_pos, end_pos + 1))
     
     # Create environment and agent
-    env = LineWorld(states, goal_pos, reward_val)
+    env = LineGrid(states, goal_pos, reward_val)
     agent = QLearningAgent(env, config["alpha"], config["gamma"], config["epsilon"])
     
     # Store in session state with tab prefix
@@ -455,21 +448,33 @@ def init_session_state_2d(config: dict) -> None:
     y_start = config["y_start"]
     y_end = config["y_end"]
     goal_pos = (config["goal_x"], config["goal_y"])
+    reward_val = config["reward_val"]
+    
+    # Create environment and agent
+    env = RectangularGrid(x_start, x_end, y_start, y_end, goal_pos, reward_val)
+    agent = QLearningAgent(env, config["alpha"], config["gamma"], config["epsilon"])
+    
+    # Store in session state with tab prefix
+    st.session_state[f"{tab_id}_env"] = env
+    st.session_state[f"{tab_id}_agent"] = agent
     
     # Create all states as (x, y) tuples (Cartesian coordinates)
     all_states = [(x, y) for x in range(x_start, x_end + 1) for y in range(y_start, y_end + 1)]
     st.session_state[f"{tab_id}_all_states"] = all_states
     st.session_state[f"{tab_id}_goal_pos"] = goal_pos
     
-    # Q-table as dict keyed by ((x, y), action)
+    # Get actions from environment
+    actions_2d = list(env.ACTIONS.keys())
+    
+    # Q-table as dict keyed by ((x, y), action) - sync with agent.Q
     q_dict = {}
     for state in all_states:
-        for action in ACTIONS_2D:
-            q_dict[(state, action)] = 0.0
+        for action in actions_2d:
+            q_dict[(state, action)] = agent.Q[(state, action)]
     st.session_state[f"{tab_id}_q_dict"] = q_dict
     
     # Also create DataFrame representation for display
-    q_table = pd.DataFrame(0.0, index=[str(s) for s in all_states], columns=ACTIONS_2D)
+    q_table = pd.DataFrame(0.0, index=[str(s) for s in all_states], columns=actions_2d)
     st.session_state[f"{tab_id}_q_table"] = q_table
     
     # Episode tracking
@@ -546,10 +551,12 @@ def record_q_history_2d(config: dict) -> None:
     tab_id = config.get("tab_id", "default")
     q_dict = st.session_state[f"{tab_id}_q_dict"]
     all_states = st.session_state[f"{tab_id}_all_states"]
+    env = st.session_state[f"{tab_id}_env"]
+    actions_2d = list(env.ACTIONS.keys())
     
     snapshot = {}
     for s in all_states:
-        for a in ACTIONS_2D:
+        for a in actions_2d:
             snapshot[f"Q{s},{a}"] = q_dict[(s, a)]
     snapshot['Episode'] = st.session_state[f"{tab_id}_total_episodes"]
     st.session_state[f"{tab_id}_q_history_plot"].append(snapshot)
@@ -559,55 +566,51 @@ def step_agent_2d(config: dict) -> None:
     """Perform one Q-learning step in 2D grid with logging (Cartesian coords)."""
     tab_id = config.get("tab_id", "default")
     state = st.session_state[f"{tab_id}_current_state"]
+    env = st.session_state[f"{tab_id}_env"]
+    agent = st.session_state[f"{tab_id}_agent"]
     q_dict = st.session_state[f"{tab_id}_q_dict"]
     q_table = st.session_state[f"{tab_id}_q_table"]
     
-    x_start = config["x_start"]
-    x_end = config["x_end"]
-    y_start = config["y_start"]
-    y_end = config["y_end"]
-    goal_pos = (config["goal_x"], config["goal_y"])
     alpha = config["alpha"]
     gamma = config["gamma"]
-    epsilon = config["epsilon"]
-    reward_val = config["reward_val"]
     
-    # 1. Choose Action (Epsilon-Greedy)
-    if np.random.rand() < epsilon:
-        action = np.random.choice(ACTIONS_2D)
+    # 1. Choose Action (Epsilon-Greedy) - use agent method
+    action = agent._greedy_action_constant(state)
+    if action is None:
+        return  # Terminal state
+    
+    # Determine decision type for logging
+    import random
+    if random.random() < agent.epsilon:
         decision_type = "Exploratory (Random)"
     else:
-        q_vals = {a: q_dict[(state, a)] for a in ACTIONS_2D}
-        max_q = max(q_vals.values())
-        best_actions = [a for a, q in q_vals.items() if q == max_q]
-        action = np.random.choice(best_actions)
         decision_type = "Max Value (Greedy)"
     
-    # 2. Environment interaction (with boundary clipping) - Cartesian (x, y)
-    dx, dy = ACTIONS_2D_DELTA[action]
-    x, y = state
-    nx, ny = x + dx, y + dy
+    # 2. Environment interaction - use env.step()
+    next_state, reward, done = env.step(state, action)
     
-    # Clip to bounds
-    nx = max(x_start, min(x_end, nx))
-    ny = max(y_start, min(y_end, ny))
-    next_state = (nx, ny)
-    
-    done = (next_state == goal_pos)
-    reward = reward_val if done else 0.0
-    
-    # 3. Bellman update
+    # 3. Get old Q-value before update
     old_val = q_dict[(state, action)]
+    
+    # 4. Bellman update - use agent method
+    agent._q_update(state, action, reward, next_state)
+    
+    # 5. Sync Q-values to session state dict and DataFrame
+    new_val = agent.Q[(state, action)]
+    q_dict[(state, action)] = new_val
+    q_table.at[str(state), action] = new_val
+    
+    # Also update next_state Q-values in dict (for max_next_q calculation)
+    actions_2d = list(env.ACTIONS.keys())
+    for a in actions_2d:
+        q_dict[(next_state, a)] = agent.Q[(next_state, a)]
+        q_table.at[str(next_state), a] = agent.Q[(next_state, a)]
+    
+    # Calculate max_next_q for logging
     if done:
         max_next_q = 0.0
     else:
-        max_next_q = max(q_dict[(next_state, a)] for a in ACTIONS_2D)
-    td_target = reward + gamma * max_next_q
-    new_val = old_val + alpha * (td_target - old_val)
-    
-    # Update Q-values
-    q_dict[(state, action)] = new_val
-    q_table.at[str(state), action] = new_val
+        max_next_q = max(agent.Q[(next_state, a)] for a in actions_2d)
     
     # 4. Log step details
     eq_str = (
@@ -658,18 +661,12 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
     
     progress_bar = st.progress(0)
     
-    x_start = config["x_start"]
-    x_end = config["x_end"]
-    y_start = config["y_start"]
-    y_end = config["y_end"]
-    goal_pos = (config["goal_x"], config["goal_y"])
-    alpha = config["alpha"]
-    gamma = config["gamma"]
-    epsilon = config["epsilon"]
-    reward_val = config["reward_val"]
-    
+    env = st.session_state[f"{tab_id}_env"]
+    agent = st.session_state[f"{tab_id}_agent"]
+    goal_pos = env.terminal_state
     q_dict = st.session_state[f"{tab_id}_q_dict"]
     q_table = st.session_state[f"{tab_id}_q_table"]
+    actions_2d = list(env.ACTIONS.keys())
     
     for i in range(episodes_to_run):
         # Reset for new episode
@@ -677,7 +674,8 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
             start_s = get_start_state_2d(
                 config["start_mode"],
                 (config["fixed_start_x"], config["fixed_start_y"]),
-                x_start, x_end, y_start, y_end,
+                config["x_start"], config["x_end"],
+                config["y_start"], config["y_end"],
                 goal_pos
             )
             st.session_state[f"{tab_id}_current_state"] = start_s
@@ -687,33 +685,25 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
         curr_s = st.session_state[f"{tab_id}_current_state"]
         steps = 0
         
-        while curr_s != goal_pos:
-            # Epsilon-greedy
-            if np.random.rand() < epsilon:
-                action = np.random.choice(ACTIONS_2D)
-            else:
-                q_vals = {a: q_dict[(curr_s, a)] for a in ACTIONS_2D}
-                max_q = max(q_vals.values())
-                best = [a for a, q in q_vals.items() if q == max_q]
-                action = np.random.choice(best)
+        while not env.is_terminal(curr_s) and steps < 100:
+            # Use agent's epsilon-greedy action selection
+            action = agent._greedy_action_constant(curr_s)
+            if action is None:
+                break
             
-            # Step - Cartesian (x, y)
-            dx, dy = ACTIONS_2D_DELTA[action]
-            x, y = curr_s
-            nx, ny = x + dx, y + dy
-            nx = max(x_start, min(x_end, nx))
-            ny = max(y_start, min(y_end, ny))
-            next_s = (nx, ny)
+            # Use environment's step method
+            next_s, reward, _ = env.step(curr_s, action)
             
-            done = (next_s == goal_pos)
-            reward = reward_val if done else 0.0
+            # Use agent's Q-update method
+            agent._q_update(curr_s, action, reward, next_s)
             
-            # Update
-            old_v = q_dict[(curr_s, action)]
-            max_next = 0.0 if done else max(q_dict[(next_s, a)] for a in ACTIONS_2D)
-            new_v = old_v + alpha * (reward + gamma * max_next - old_v)
-            q_dict[(curr_s, action)] = new_v
-            q_table.at[str(curr_s), action] = new_v
+            # Sync Q-values to session state
+            q_dict[(curr_s, action)] = agent.Q[(curr_s, action)]
+            q_table.at[str(curr_s), action] = agent.Q[(curr_s, action)]
+            # Also sync next_state Q-values
+            for a in actions_2d:
+                q_dict[(next_s, a)] = agent.Q[(next_s, a)]
+                q_table.at[str(next_s), a] = agent.Q[(next_s, a)]
             
             curr_s = next_s
             steps += 1

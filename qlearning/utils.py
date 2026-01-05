@@ -1,24 +1,24 @@
 """Helper utilities"""
 from __future__ import annotations
 
-import itertools
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from qlearning.environment import ACTIONS, LineWorld
 from qlearning.agent import QLearningAgent
 
 
 def q_table_dataframe(agent: QLearningAgent, states: List[int]) -> pd.DataFrame:
     """Return Q-table as a DataFrame indexed by *states*."""
+    # Get actions from the environment (assumes 1D LineGrid)
+    actions = list(agent.env.ACTIONS.keys())
     data = []
     for s in states:
-        row = {a: agent.Q.get((s, a), 0.0) for a in ACTIONS}
+        row = {a: agent.Q.get((s, a), 0.0) for a in actions}
         data.append(row)
     df = pd.DataFrame(data, index=states)
-    df.columns = ACTIONS.keys()
+    df.columns = actions
     return df
 
 
