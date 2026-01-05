@@ -28,6 +28,6 @@ def render_bellman_log(history_log: list[dict]) -> None:
             by=["Episode", "Step"], ascending=False
         ),
         use_container_width=True,
-        height=200
+        height=300
     )
 

@@ -7,6 +7,9 @@ import streamlit as st
 
 from qlearning import LineWorld, QLearningAgent
 
+# Performance: Limit checkpoint history to prevent memory bloat
+MAX_CHECKPOINTS = 50
+
 __all__ = [
     "init_session_state",
     "get_start_state",
@@ -20,33 +23,51 @@ __all__ = [
     "jump_to_latest",
     "get_display_state",
     "is_in_playback_mode",
-    "save_checkpoint"
+    "save_checkpoint",
+    # 2D functions
+    "init_session_state_2d",
+    "get_start_state_2d",
+    "reset_episode_2d",
+    "record_q_history_2d",
+    "step_agent_2d",
+    "run_batch_training_2d",
 ]
 
 ACTIONS = ["L", "R"]
+ACTIONS_2D = ["U", "D", "L", "R"]
+ACTIONS_2D_DELTA = {
+    "U": (0, 1),   # Up increases Y (Cartesian)
+    "D": (0, -1),  # Down decreases Y (Cartesian)
+    "L": (-1, 0),  # Left decreases X
+    "R": (1, 0),   # Right increases X
+}
 
 
 def init_session_state(config: dict) -> None:
     """Initialize or reset all session state for new environment (tab-scoped)."""
     tab_id = config.get("tab_id", "default")
-    grid_size = config["grid_size"]
+    start_pos = config["start_pos"]
+    end_pos = config["end_pos"]
     goal_pos = config["goal_pos"]
     reward_val = config["reward_val"]
     
+    # Create states from start_pos to end_pos (inclusive)
+    states = list(range(start_pos, end_pos + 1))
+    
     # Create environment and agent
-    env = LineWorld(list(range(grid_size)), goal_pos, reward_val)
+    env = LineWorld(states, goal_pos, reward_val)
     agent = QLearningAgent(env, config["alpha"], config["gamma"], config["epsilon"])
     
     # Store in session state with tab prefix
     st.session_state[f"{tab_id}_env"] = env
     st.session_state[f"{tab_id}_agent"] = agent
     
-    # Q-table as DataFrame for display compatibility
-    st.session_state[f"{tab_id}_q_table"] = pd.DataFrame(0.0, index=range(grid_size), columns=ACTIONS)
+    # Q-table as DataFrame for display compatibility (index uses actual position values)
+    st.session_state[f"{tab_id}_q_table"] = pd.DataFrame(0.0, index=states, columns=ACTIONS)
     
     # Episode tracking
     start_s = get_start_state(
-        config["start_mode"], config["fixed_start_pos"], grid_size, goal_pos
+        config["start_mode"], config["fixed_start_pos"], start_pos, end_pos, goal_pos
     )
     st.session_state[f"{tab_id}_current_state"] = start_s
     st.session_state[f"{tab_id}_current_path"] = [start_s]
@@ -61,6 +82,7 @@ def init_session_state(config: dict) -> None:
     st.session_state[f"{tab_id}_checkpoints"] = []  # User action checkpoints for rewind
     st.session_state[f"{tab_id}_total_episodes"] = 0
     st.session_state[f"{tab_id}_playback_index"] = -1  # -1 = live, 0+ = checkpoint index
+    st.session_state[f"{tab_id}_steps_per_episode"] = []  # Steps taken in each completed episode
     
     record_q_history(config)
     
@@ -68,12 +90,12 @@ def init_session_state(config: dict) -> None:
     save_checkpoint(config, "init", {"description": "Initial state"})
 
 
-def get_start_state(mode: str, fixed_pos: int, grid_size: int, goal_pos: int) -> int:
+def get_start_state(mode: str, fixed_pos: int, start_pos: int, end_pos: int, goal_pos: int) -> int:
     """Get starting state based on mode (Fixed/Randomized)."""
     if mode == "Randomized":
-        possible_starts = [i for i in range(grid_size) if i != goal_pos]
+        possible_starts = [i for i in range(start_pos, end_pos + 1) if i != goal_pos]
         if not possible_starts:
-            return 0
+            return start_pos
         return int(np.random.choice(possible_starts))
     return fixed_pos
 
@@ -88,7 +110,8 @@ def reset_episode(config: dict) -> None:
     start_s = get_start_state(
         config["start_mode"],
         config["fixed_start_pos"],
-        config["grid_size"],
+        config["start_pos"],
+        config["end_pos"],
         config["goal_pos"]
     )
     st.session_state[f"{tab_id}_current_state"] = start_s
@@ -142,10 +165,16 @@ def save_checkpoint(config: dict, action_type: str, metadata: dict = None) -> No
         "is_terminal": st.session_state[f"{tab_id}_is_terminal"],
         "ready_for_episode": st.session_state[f"{tab_id}_ready_for_episode"],
         "total_episodes": st.session_state[f"{tab_id}_total_episodes"],
+        "steps_per_episode": st.session_state[f"{tab_id}_steps_per_episode"].copy(),
         "metadata": metadata or {}
     }
     
-    st.session_state[f"{tab_id}_checkpoints"].append(checkpoint)
+    checkpoints = st.session_state[f"{tab_id}_checkpoints"]
+    checkpoints.append(checkpoint)
+    
+    # Limit checkpoint history to prevent memory bloat (keep first init + recent checkpoints)
+    if len(checkpoints) > MAX_CHECKPOINTS:
+        st.session_state[f"{tab_id}_checkpoints"] = [checkpoints[0]] + checkpoints[-(MAX_CHECKPOINTS - 1):]
 
 
 def step_agent(config: dict) -> None:
@@ -153,7 +182,8 @@ def step_agent(config: dict) -> None:
     tab_id = config.get("tab_id", "default")
     state = st.session_state[f"{tab_id}_current_state"]
     q_df = st.session_state[f"{tab_id}_q_table"]
-    grid_size = config["grid_size"]
+    start_pos = config["start_pos"]
+    end_pos = config["end_pos"]
     goal_pos = config["goal_pos"]
     alpha = config["alpha"]
     gamma = config["gamma"]
@@ -173,7 +203,7 @@ def step_agent(config: dict) -> None:
     
     # 2. Environment interaction
     move = -1 if action == "L" else 1
-    next_state = max(0, min(grid_size - 1, state + move))
+    next_state = max(start_pos, min(end_pos, state + move))
     done = (next_state == goal_pos)
     r = reward_val if done else 0.0
     
@@ -220,6 +250,9 @@ def step_agent(config: dict) -> None:
         steps_taken = sum(1 for log in st.session_state[f"{tab_id}_step_log"] if log["Episode"] == episode_num)
         record_episode(config, steps_taken, episode_start, next_state)
         
+        # Record steps for this completed episode
+        st.session_state[f"{tab_id}_steps_per_episode"].append(steps_taken)
+        
         st.session_state[f"{tab_id}_total_episodes"] += 1
         st.session_state[f"{tab_id}_ready_for_episode"] = True  # Ready for next episode
         record_q_history(config)
@@ -239,7 +272,8 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
         st.session_state[f"{tab_id}_ready_for_episode"] = True
     
     progress_bar = st.progress(0)
-    grid_size = config["grid_size"]
+    start_pos = config["start_pos"]
+    end_pos = config["end_pos"]
     goal_pos = config["goal_pos"]
     alpha = config["alpha"]
     gamma = config["gamma"]
@@ -250,7 +284,7 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
         # Internal reset for batch training (doesn't change ready flag)
         if st.session_state[f"{tab_id}_is_terminal"] or st.session_state[f"{tab_id}_current_state"] == goal_pos:
             start_s = get_start_state(
-                config["start_mode"], config["fixed_start_pos"], grid_size, goal_pos
+                config["start_mode"], config["fixed_start_pos"], start_pos, end_pos, goal_pos
             )
             st.session_state[f"{tab_id}_current_state"] = start_s
             st.session_state[f"{tab_id}_current_path"] = [start_s]
@@ -271,7 +305,7 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
             
             # Step
             move = -1 if a == "L" else 1
-            next_s = max(0, min(grid_size - 1, curr_s + move))
+            next_s = max(start_pos, min(end_pos, curr_s + move))
             done = (next_s == goal_pos)
             r = reward_val if done else 0.0
             
@@ -292,9 +326,14 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
         # Log episode data
         record_episode(config, steps, episode_start, curr_s)
         
+        # Record steps for this completed episode
+        st.session_state[f"{tab_id}_steps_per_episode"].append(steps)
+        
         st.session_state[f"{tab_id}_total_episodes"] += 1
-        record_q_history(config)
         progress_bar.progress((i + 1) / episodes_to_run)
+    
+    # Record Q-history only once after all batch episodes complete (performance optimization)
+    record_q_history(config)
     
     # After batch, set to ready state (terminal, ready for next action)
     st.session_state[f"{tab_id}_is_terminal"] = True
@@ -325,6 +364,7 @@ def get_display_state(config: dict) -> dict:
             "total_episodes": st.session_state[f"{tab_id}_total_episodes"],
             "ready_for_episode": st.session_state.get(f"{tab_id}_ready_for_episode", True),
             "is_terminal": st.session_state.get(f"{tab_id}_is_terminal", True),
+            "steps_per_episode": st.session_state.get(f"{tab_id}_steps_per_episode", []),
             "is_live": True
         }
     
@@ -346,6 +386,7 @@ def get_display_state(config: dict) -> dict:
         "total_episodes": checkpoint["total_episodes"],
         "ready_for_episode": checkpoint.get("ready_for_episode", True),
         "is_terminal": checkpoint.get("is_terminal", True),
+        "steps_per_episode": checkpoint.get("steps_per_episode", []),
         "action_type": checkpoint["type"],
         "metadata": checkpoint["metadata"],
         "is_live": False
@@ -395,4 +436,299 @@ def jump_to_latest(config: dict) -> None:
     """Jump back to live (latest) state."""
     tab_id = config.get("tab_id", "default")
     st.session_state[f"{tab_id}_playback_index"] = -1
+
+
+# ============================================================================
+# 2D Grid Functions
+# ============================================================================
+
+
+def init_session_state_2d(config: dict) -> None:
+    """Initialize or reset all session state for 2D grid environment (tab-scoped)."""
+    tab_id = config.get("tab_id", "default")
+    x_start = config["x_start"]
+    x_end = config["x_end"]
+    y_start = config["y_start"]
+    y_end = config["y_end"]
+    goal_pos = (config["goal_x"], config["goal_y"])
+    
+    # Create all states as (x, y) tuples (Cartesian coordinates)
+    all_states = [(x, y) for x in range(x_start, x_end + 1) for y in range(y_start, y_end + 1)]
+    st.session_state[f"{tab_id}_all_states"] = all_states
+    st.session_state[f"{tab_id}_goal_pos"] = goal_pos
+    
+    # Q-table as dict keyed by ((x, y), action)
+    q_dict = {}
+    for state in all_states:
+        for action in ACTIONS_2D:
+            q_dict[(state, action)] = 0.0
+    st.session_state[f"{tab_id}_q_dict"] = q_dict
+    
+    # Also create DataFrame representation for display
+    q_table = pd.DataFrame(0.0, index=[str(s) for s in all_states], columns=ACTIONS_2D)
+    st.session_state[f"{tab_id}_q_table"] = q_table
+    
+    # Episode tracking
+    start_s = get_start_state_2d(
+        config["start_mode"],
+        (config["fixed_start_x"], config["fixed_start_y"]),
+        x_start, x_end, y_start, y_end,
+        goal_pos
+    )
+    st.session_state[f"{tab_id}_current_state"] = start_s
+    st.session_state[f"{tab_id}_current_path"] = [start_s]
+    st.session_state[f"{tab_id}_is_terminal"] = (start_s == goal_pos)
+    st.session_state[f"{tab_id}_episode_start"] = start_s
+    st.session_state[f"{tab_id}_ready_for_episode"] = True
+    
+    # Logging
+    st.session_state[f"{tab_id}_history_log"] = []
+    st.session_state[f"{tab_id}_step_log"] = []
+    st.session_state[f"{tab_id}_q_history_plot"] = []
+    st.session_state[f"{tab_id}_checkpoints"] = []
+    st.session_state[f"{tab_id}_total_episodes"] = 0
+    st.session_state[f"{tab_id}_playback_index"] = -1
+    st.session_state[f"{tab_id}_steps_per_episode"] = []
+    
+    record_q_history_2d(config)
+    save_checkpoint(config, "init", {"description": "Initial state"})
+
+
+def get_start_state_2d(
+    mode: str,
+    fixed_pos: tuple[int, int],
+    x_start: int,
+    x_end: int,
+    y_start: int,
+    y_end: int,
+    goal_pos: tuple[int, int]
+) -> tuple[int, int]:
+    """Get starting state for 2D grid based on mode (Fixed/Randomized)."""
+    if mode == "Randomized":
+        possible_starts = [
+            (x, y) for x in range(x_start, x_end + 1) for y in range(y_start, y_end + 1)
+            if (x, y) != goal_pos
+        ]
+        if not possible_starts:
+            return (x_start, y_start)
+        idx = int(np.random.choice(len(possible_starts)))
+        return possible_starts[idx]
+    return fixed_pos
+
+
+def reset_episode_2d(config: dict) -> None:
+    """Reset agent position for new episode in 2D grid (keep Q-table)."""
+    tab_id = config.get("tab_id", "default")
+    goal_pos = (config["goal_x"], config["goal_y"])
+    
+    start_s = get_start_state_2d(
+        config["start_mode"],
+        (config["fixed_start_x"], config["fixed_start_y"]),
+        config["x_start"], config["x_end"],
+        config["y_start"], config["y_end"],
+        goal_pos
+    )
+    st.session_state[f"{tab_id}_current_state"] = start_s
+    st.session_state[f"{tab_id}_current_path"] = [start_s]
+    st.session_state[f"{tab_id}_is_terminal"] = (start_s == goal_pos)
+    st.session_state[f"{tab_id}_episode_start"] = start_s
+    st.session_state[f"{tab_id}_ready_for_episode"] = False
+    
+    save_checkpoint(config, "episode_start", {"episode": st.session_state[f"{tab_id}_total_episodes"] + 1})
+
+
+def record_q_history_2d(config: dict) -> None:
+    """Snapshot Q-table for plotting - 2D version."""
+    tab_id = config.get("tab_id", "default")
+    q_dict = st.session_state[f"{tab_id}_q_dict"]
+    all_states = st.session_state[f"{tab_id}_all_states"]
+    
+    snapshot = {}
+    for s in all_states:
+        for a in ACTIONS_2D:
+            snapshot[f"Q{s},{a}"] = q_dict[(s, a)]
+    snapshot['Episode'] = st.session_state[f"{tab_id}_total_episodes"]
+    st.session_state[f"{tab_id}_q_history_plot"].append(snapshot)
+
+
+def step_agent_2d(config: dict) -> None:
+    """Perform one Q-learning step in 2D grid with logging (Cartesian coords)."""
+    tab_id = config.get("tab_id", "default")
+    state = st.session_state[f"{tab_id}_current_state"]
+    q_dict = st.session_state[f"{tab_id}_q_dict"]
+    q_table = st.session_state[f"{tab_id}_q_table"]
+    
+    x_start = config["x_start"]
+    x_end = config["x_end"]
+    y_start = config["y_start"]
+    y_end = config["y_end"]
+    goal_pos = (config["goal_x"], config["goal_y"])
+    alpha = config["alpha"]
+    gamma = config["gamma"]
+    epsilon = config["epsilon"]
+    reward_val = config["reward_val"]
+    
+    # 1. Choose Action (Epsilon-Greedy)
+    if np.random.rand() < epsilon:
+        action = np.random.choice(ACTIONS_2D)
+        decision_type = "Exploratory (Random)"
+    else:
+        q_vals = {a: q_dict[(state, a)] for a in ACTIONS_2D}
+        max_q = max(q_vals.values())
+        best_actions = [a for a, q in q_vals.items() if q == max_q]
+        action = np.random.choice(best_actions)
+        decision_type = "Max Value (Greedy)"
+    
+    # 2. Environment interaction (with boundary clipping) - Cartesian (x, y)
+    dx, dy = ACTIONS_2D_DELTA[action]
+    x, y = state
+    nx, ny = x + dx, y + dy
+    
+    # Clip to bounds
+    nx = max(x_start, min(x_end, nx))
+    ny = max(y_start, min(y_end, ny))
+    next_state = (nx, ny)
+    
+    done = (next_state == goal_pos)
+    reward = reward_val if done else 0.0
+    
+    # 3. Bellman update
+    old_val = q_dict[(state, action)]
+    if done:
+        max_next_q = 0.0
+    else:
+        max_next_q = max(q_dict[(next_state, a)] for a in ACTIONS_2D)
+    td_target = reward + gamma * max_next_q
+    new_val = old_val + alpha * (td_target - old_val)
+    
+    # Update Q-values
+    q_dict[(state, action)] = new_val
+    q_table.at[str(state), action] = new_val
+    
+    # 4. Log step details
+    eq_str = (
+        f"Q({state}, {action}) = {old_val:.2f} + {alpha} * "
+        f"[{reward} + {gamma} * {max_next_q:.2f} - {old_val:.2f}] = **{new_val:.4f}**"
+    )
+    
+    episode_num = st.session_state[f"{tab_id}_total_episodes"] + 1
+    episode_step_count = sum(1 for log in st.session_state[f"{tab_id}_step_log"] if log["Episode"] == episode_num) + 1
+    
+    step_entry = {
+        "Episode": episode_num,
+        "Step": episode_step_count,
+        "State": state,
+        "Action": action,
+        "Type": decision_type,
+        "Equation": eq_str,
+        "New Q": new_val
+    }
+    st.session_state[f"{tab_id}_step_log"].append(step_entry)
+    
+    # 5. Move agent
+    st.session_state[f"{tab_id}_current_state"] = next_state
+    st.session_state[f"{tab_id}_current_path"].append(next_state)
+    st.session_state[f"{tab_id}_is_terminal"] = done
+    st.session_state[f"{tab_id}_ready_for_episode"] = False
+    
+    if done:
+        steps_taken = sum(1 for log in st.session_state[f"{tab_id}_step_log"] if log["Episode"] == episode_num)
+        
+        # Record steps for completed episode
+        st.session_state[f"{tab_id}_steps_per_episode"].append(steps_taken)
+        
+        st.session_state[f"{tab_id}_total_episodes"] += 1
+        st.session_state[f"{tab_id}_ready_for_episode"] = True
+        record_q_history_2d(config)
+    
+    save_checkpoint(config, "step", {"episode": episode_num, "step": episode_step_count})
+
+
+def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
+    """Fast-forward training for N episodes in 2D grid (Cartesian coords)."""
+    tab_id = config.get("tab_id", "default")
+    
+    if not st.session_state.get(f"{tab_id}_ready_for_episode", True):
+        st.session_state[f"{tab_id}_is_terminal"] = True
+        st.session_state[f"{tab_id}_ready_for_episode"] = True
+    
+    progress_bar = st.progress(0)
+    
+    x_start = config["x_start"]
+    x_end = config["x_end"]
+    y_start = config["y_start"]
+    y_end = config["y_end"]
+    goal_pos = (config["goal_x"], config["goal_y"])
+    alpha = config["alpha"]
+    gamma = config["gamma"]
+    epsilon = config["epsilon"]
+    reward_val = config["reward_val"]
+    
+    q_dict = st.session_state[f"{tab_id}_q_dict"]
+    q_table = st.session_state[f"{tab_id}_q_table"]
+    
+    for i in range(episodes_to_run):
+        # Reset for new episode
+        if st.session_state[f"{tab_id}_is_terminal"] or st.session_state[f"{tab_id}_current_state"] == goal_pos:
+            start_s = get_start_state_2d(
+                config["start_mode"],
+                (config["fixed_start_x"], config["fixed_start_y"]),
+                x_start, x_end, y_start, y_end,
+                goal_pos
+            )
+            st.session_state[f"{tab_id}_current_state"] = start_s
+            st.session_state[f"{tab_id}_current_path"] = [start_s]
+            st.session_state[f"{tab_id}_is_terminal"] = False
+        
+        curr_s = st.session_state[f"{tab_id}_current_state"]
+        steps = 0
+        
+        while curr_s != goal_pos:
+            # Epsilon-greedy
+            if np.random.rand() < epsilon:
+                action = np.random.choice(ACTIONS_2D)
+            else:
+                q_vals = {a: q_dict[(curr_s, a)] for a in ACTIONS_2D}
+                max_q = max(q_vals.values())
+                best = [a for a, q in q_vals.items() if q == max_q]
+                action = np.random.choice(best)
+            
+            # Step - Cartesian (x, y)
+            dx, dy = ACTIONS_2D_DELTA[action]
+            x, y = curr_s
+            nx, ny = x + dx, y + dy
+            nx = max(x_start, min(x_end, nx))
+            ny = max(y_start, min(y_end, ny))
+            next_s = (nx, ny)
+            
+            done = (next_s == goal_pos)
+            reward = reward_val if done else 0.0
+            
+            # Update
+            old_v = q_dict[(curr_s, action)]
+            max_next = 0.0 if done else max(q_dict[(next_s, a)] for a in ACTIONS_2D)
+            new_v = old_v + alpha * (reward + gamma * max_next - old_v)
+            q_dict[(curr_s, action)] = new_v
+            q_table.at[str(curr_s), action] = new_v
+            
+            curr_s = next_s
+            steps += 1
+        
+        # End episode
+        st.session_state[f"{tab_id}_current_state"] = curr_s
+        st.session_state[f"{tab_id}_is_terminal"] = True
+        
+        # Record steps for completed episode
+        st.session_state[f"{tab_id}_steps_per_episode"].append(steps)
+        
+        st.session_state[f"{tab_id}_total_episodes"] += 1
+        progress_bar.progress((i + 1) / episodes_to_run)
+    
+    # Record Q-history only once after all batch episodes complete (performance optimization)
+    record_q_history_2d(config)
+    
+    st.session_state[f"{tab_id}_is_terminal"] = True
+    st.session_state[f"{tab_id}_ready_for_episode"] = True
+    
+    save_checkpoint(config, "batch", {"episodes": episodes_to_run})
 
