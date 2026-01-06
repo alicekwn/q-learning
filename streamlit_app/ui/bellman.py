@@ -37,6 +37,6 @@ def render_bellman_log(history_log: list[dict]) -> None:
         log_df[
             ["Episode", "Step", "State (s)", "Action (a)", "Type", "Equation", "New Q"]
         ].sort_values(by=["Episode", "Step"], ascending=False),
-        use_container_width=True,
+        width="stretch",
         height=300,
     )

@@ -122,7 +122,7 @@ with tab_1d:
         st.subheader("Current Q-Matrix")
         st.dataframe(
             display_state_1d["q_table"].style.highlight_max(axis=1, color="lightgreen"),
-            use_container_width=True,
+            width="stretch",
         )
 
         # --- Plot vector field diagram using q matrix ---
@@ -257,7 +257,7 @@ with tab_2d:
         st.subheader("Current Q-Matrix")
         st.dataframe(
             display_state_2d["q_table"].style.highlight_max(axis=1, color="lightgreen"),
-            use_container_width=True,
+            width="stretch",
             height="content",
         )
         # --- Plot vector field diagram using q matrix ---
