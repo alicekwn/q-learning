@@ -104,7 +104,18 @@ def playback_indicator(display_state: dict, in_playback: bool) -> None:
         action = display_state.get("action_type", "unknown")
         meta = display_state.get("metadata", {})
         if action == "batch":
-            desc = f"Batch Training ({meta.get('episodes', '0')} episodes)"
+            episodes_trained = meta.get("episodes", 0)
+            total_episodes = display_state.get("total_episodes", 0)
+            if episodes_trained > 0 and total_episodes >= episodes_trained:
+                # Calculate episode range: start = total - episodes + 1, end = total
+                start_episode = total_episodes - episodes_trained + 1
+                end_episode = total_episodes
+                if start_episode == end_episode:
+                    desc = f"Batch Trained {meta.get('episodes', '0')} episodes (episode {start_episode})"
+                else:
+                    desc = f"Batch Trained {meta.get('episodes', '0')} episodes (episodes {start_episode}-{end_episode})"
+            else:
+                desc = f"Batch Trained ({episodes_trained} episodes)"
         else:
             desc = f"Episode {meta.get('episode', '0')}, Step {meta.get('step', '0')}"
         st.warning(f"⏪ **Playback Mode** - {desc}")

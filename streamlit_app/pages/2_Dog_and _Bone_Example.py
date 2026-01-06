@@ -83,7 +83,6 @@ with tab_1d:
     in_playback_1d = is_in_playback_mode(config_tab1)
 
     # Render playback indicator
-    playback_indicator(display_state_1d, in_playback_1d)
 
     # --- B. GRID ---
     ready = display_state_1d.get("ready_for_episode", True)
@@ -98,6 +97,7 @@ with tab_1d:
         show_path=not ready,
         show_dog=show_dog,
     )
+    playback_indicator(display_state_1d, in_playback_1d)
 
     # --- C. CONTROLS & DISPLAY AREA ---
     col_step, col_info = st.columns([1, 2])
@@ -209,9 +209,6 @@ with tab_2d:
     display_state_2d = get_display_state(config_tab2)
     in_playback_2d = is_in_playback_mode(config_tab2)
 
-    # Render playback indicator
-    playback_indicator(display_state_2d, in_playback_2d)
-
     # --- B. GRID & Training Controls & Playback Controls ---
     col_spacer_2d, header_2d, col_grid_2d, col_spacer_2d = st.columns([0.2, 1, 4, 0.5])
     with header_2d:
@@ -236,6 +233,9 @@ with tab_2d:
         if not ready_2d:
             st.write(f"**Current Path:** {display_state_2d['current_path']}")
 
+    # Render playback indicator
+    playback_indicator(display_state_2d, in_playback_2d)
+
     with col_spacer_2d:
         st.markdown(" ")
 
@@ -254,12 +254,14 @@ with tab_2d:
             run_batch_training_2d,
         )
         st.markdown("---")
-        st.subheader("Current Q-Matrix")
-        st.dataframe(
-            display_state_2d["q_table"].style.highlight_max(axis=1, color="lightgreen"),
-            width="stretch",
-            height="content",
-        )
+        with st.expander("Current Q-Matrix", expanded=True):
+            st.dataframe(
+                display_state_2d["q_table"].style.highlight_max(
+                    axis=1, color="lightgreen"
+                ),
+                width="stretch",
+                height="content",
+            )
         # --- Plot vector field diagram using q matrix ---
         render_policy_2d(
             display_state_2d["q_table"],
