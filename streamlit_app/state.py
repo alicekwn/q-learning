@@ -176,6 +176,9 @@ def save_checkpoint(config: dict, action_type: str, metadata: dict = None) -> No
         "ready_for_episode": st.session_state[f"{tab_id}_ready_for_episode"],
         "total_episodes": st.session_state[f"{tab_id}_total_episodes"],
         "steps_per_episode": st.session_state[f"{tab_id}_steps_per_episode"].copy(),
+        "step_log_count": len(
+            st.session_state[f"{tab_id}_step_log"]
+        ),  # Track how many log entries at this checkpoint
         "metadata": metadata or {},
     }
 
@@ -222,6 +225,9 @@ def step_agent(config: dict) -> None:
     # 3. Bellman update
     old_val = q_df.at[state, action]
     max_next_q = 0.0 if done else q_df.loc[next_state].max()
+    max_next_action = q_df.loc[
+        next_state
+    ].idxmax()  # The action that maximises the Q-value for the next state
     td_target = r + gamma * max_next_q
     new_val = old_val + alpha * (td_target - old_val)
 
@@ -231,8 +237,8 @@ def step_agent(config: dict) -> None:
 
     # 4. Log step details (for detailed view if needed)
     eq_str = (
-        f"Q({state}, {action}) = {old_val:.2f} + {alpha} * "
-        f"[{r} + {gamma} * {max_next_q:.2f} - {old_val:.2f}] = **{new_val:.4f}**"
+        f"Q({state}, {action}) = {old_val:.4f} + {alpha} * "
+        f"[{r} + {gamma} * {max_next_q:.4f} - {old_val:.4f}] = **{new_val:.4f}**"
     )
 
     # Count steps within current episode
@@ -249,8 +255,11 @@ def step_agent(config: dict) -> None:
     step_entry = {
         "Episode": episode_num,  # Current episode (1-indexed)
         "Step": episode_step_count,  # Step within this episode
-        "State": state,
-        "Action": action,
+        "State (s)": state,
+        "Action (a)": action,
+        "Next state": next_state,
+        "Next action": max_next_action,
+        "Max next Q": max_next_q,
         "Type": decision_type,
         "Equation": eq_str,
         "New Q": new_val,
@@ -415,12 +424,19 @@ def get_display_state(config: dict) -> dict:
 
     checkpoint = checkpoints[playback_idx]
 
+    # Filter step_log to only show entries up to this checkpoint
+    # For backward compatibility, if step_log_count doesn't exist, show all logs
+    step_log_count = checkpoint.get(
+        "step_log_count", len(st.session_state[f"{tab_id}_step_log"])
+    )
+    filtered_step_log = st.session_state[f"{tab_id}_step_log"][:step_log_count]
+
     return {
         "q_table": checkpoint["q_table"],
         "q_history_plot": checkpoint["q_history_plot"],
         "current_state": checkpoint["current_state"],
         "current_path": checkpoint["current_path"],
-        "step_log": st.session_state[f"{tab_id}_step_log"],  # Always show all logs
+        "step_log": filtered_step_log,  # Show only logs up to this checkpoint
         "total_episodes": checkpoint["total_episodes"],
         "ready_for_episode": checkpoint.get("ready_for_episode", True),
         "is_terminal": checkpoint.get("is_terminal", True),
@@ -442,8 +458,10 @@ def rewind_checkpoint(config: dict) -> None:
     current_idx = st.session_state[f"{tab_id}_playback_index"]
 
     if current_idx < 0:  # Currently live
-        # Jump to last checkpoint
-        st.session_state[f"{tab_id}_playback_index"] = len(checkpoints) - 1
+        # Go to the checkpoint before the last one (which is the current live state)
+        # If there's only one checkpoint, go to it (index 0)
+        target_idx = max(0, len(checkpoints) - 2)
+        st.session_state[f"{tab_id}_playback_index"] = target_idx
     elif current_idx > 0:
         # Go back one checkpoint
         st.session_state[f"{tab_id}_playback_index"] = current_idx - 1
@@ -462,12 +480,13 @@ def forward_checkpoint(config: dict) -> None:
     if current_idx < 0:  # Currently live, do nothing
         return
 
-    if current_idx < len(checkpoints) - 1:
+    # If at second-to-last or last checkpoint, jump directly to live mode
+    # (same behavior as "Latest action" button)
+    if current_idx >= len(checkpoints) - 2:
+        st.session_state[f"{tab_id}_playback_index"] = -1
+    else:
         # Move forward one checkpoint
         st.session_state[f"{tab_id}_playback_index"] = current_idx + 1
-    else:
-        # At last checkpoint, jump to live
-        st.session_state[f"{tab_id}_playback_index"] = -1
 
 
 def jump_to_start(config: dict) -> None:
@@ -673,10 +692,14 @@ def step_agent_2d(config: dict) -> None:
     else:
         max_next_q = max(agent.Q[(next_state, a)] for a in actions_2d)
 
+    max_next_action = q_table.loc[
+        str(next_state)
+    ].idxmax()  # The action that maximises the Q-value for the next state
+
     # 4. Log step details
     eq_str = (
-        f"Q({state}, {action}) = {old_val:.2f} + {alpha} * "
-        f"[{reward} + {gamma} * {max_next_q:.2f} - {old_val:.2f}] = **{new_val:.4f}**"
+        f"Q({state}, {action}) = {old_val:.4f} + {alpha} * "
+        f"[{reward} + {gamma} * {max_next_q:.4f} - {old_val:.4f}] = **{new_val:.4f}**"
     )
 
     episode_num = st.session_state[f"{tab_id}_total_episodes"] + 1
@@ -692,8 +715,11 @@ def step_agent_2d(config: dict) -> None:
     step_entry = {
         "Episode": episode_num,
         "Step": episode_step_count,
-        "State": state,
-        "Action": action,
+        "State (s)": state,
+        "Action (a)": action,
+        "Next state": next_state,
+        "Next action": max_next_action,
+        "Max next Q": max_next_q,
         "Type": decision_type,
         "Equation": eq_str,
         "New Q": new_val,

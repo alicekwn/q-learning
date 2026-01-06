@@ -84,19 +84,24 @@ def q_learning_parameters(tab_id: str) -> dict:
 
     with col_a:
         alpha: float = st.slider(
-            "Alpha (Learning Rate)", 0.0, 1.0, 0.5, 0.01, key=f"{tab_id}_alpha"
+            r"$\alpha$ (Learning Rate)", 0.0, 1.0, 0.5, 0.01, key=f"{tab_id}_alpha"
         )
     with col_g:
         gamma: float = st.slider(
-            "Gamma (Discount Factor)", 0.0, 1.0, 0.9, 0.01, key=f"{tab_id}_gamma"
+            r"$\gamma$ (Discount Factor)", 0.0, 1.0, 0.9, 0.01, key=f"{tab_id}_gamma"
         )
     with col_e:
         epsilon: float = st.slider(
-            "Epsilon (Exploration Rate)", 0.0, 1.0, 0.2, 0.01, key=f"{tab_id}_epsilon"
+            r"$\epsilon$ (Exploration Rate)",
+            0.0,
+            1.0,
+            0.2,
+            0.01,
+            key=f"{tab_id}_epsilon",
         )
     with col_r:
         reward_val: float = st.number_input(
-            "Reward Value", value=1.0, key=f"{tab_id}_reward"
+            r"Reward Value $r$", value=1.0, key=f"{tab_id}_reward"
         )
 
     return {
@@ -167,6 +172,7 @@ def parameters_1d(tab_id: str) -> dict:
                     max_value=end_pos,
                     value=start_pos,
                     key=f"{tab_id}_fixed_start",
+                    help="Choose whether the dog starts at a fixed position or a random position for each episode.",
                 )
             else:
                 st.info("Random start each episode")
@@ -198,43 +204,68 @@ def parameters_2d(tab_id: str) -> dict:
     """
     # Row 1: Environment Settings
     with st.expander("🐶 Environment Settings", expanded=True):
-        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
         with col1:
+            st.markdown(
+                """
+                <div style="text-align: left;">
+                Choose the X axis range of the grid: <br>
+                <br>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             x_start: int = st.number_input(
                 "X Start", min_value=-10, max_value=10, value=0, key=f"{tab_id}_x_start"
+            )
+            x_end: int = st.number_input(
+                "X End", min_value=-10, max_value=10, value=3, key=f"{tab_id}_x_end"
+            )
+        if x_end <= x_start:
+            st.error("X End > X Start!")
+            x_end = x_start + 1
+
+        with col2:
+            st.markdown(
+                """
+                <div style="text-align: left;">
+                Choose the Y axis range of the grid: <br>
+                <br>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
             y_start: int = st.number_input(
                 "Y Start", min_value=-10, max_value=10, value=0, key=f"{tab_id}_y_start"
             )
-
-        with col2:
-            x_end: int = st.number_input(
-                "X End", min_value=-10, max_value=10, value=3, key=f"{tab_id}_x_end"
-            )
-
             y_end: int = st.number_input(
                 "Y End", min_value=-10, max_value=10, value=3, key=f"{tab_id}_y_end"
             )
-
-        if x_end <= x_start:
-            st.error("X End > X Start!")
-            x_end = x_start + 1
 
         if y_end <= y_start:
             st.error("Y End > Y Start!")
             y_end = y_start + 1
 
         with col3:
+            st.markdown(
+                """
+                <div style="text-align: left;">
+                Choose the position of the bone (Goal): <br>
+                <br>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             goal_x: int = st.number_input(
-                "Goal X",
+                "Goal position (X axis)",
                 min_value=x_start,
                 max_value=x_end,
                 value=x_end,
                 key=f"{tab_id}_goal_x",
             )
             goal_y: int = st.number_input(
-                "Goal Y",
+                "Goal position (Y axis)",
                 min_value=y_start,
                 max_value=y_end,
                 value=y_end,
@@ -243,14 +274,14 @@ def parameters_2d(tab_id: str) -> dict:
 
         with col4:
             start_mode: str = st.radio(
-                "Dog Start Mode",
+                "Choose the starting position for each episode:",
                 ["Fixed", "Randomized"],
                 index=0,
                 key=f"{tab_id}_start_mode",
                 horizontal=True,
+                help="Choose whether the dog starts at a fixed position or a random position for each episode.",
             )
 
-        with col5:
             fixed_start_x: int = x_start
             fixed_start_y: int = y_start
             if start_mode == "Fixed":
