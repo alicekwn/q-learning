@@ -119,19 +119,22 @@ with tab_1d:
         st.markdown("---")
 
         # Render Q-Matrix
-        st.subheader("Current Q-Matrix")
-        st.dataframe(
-            display_state_1d["q_table"].style.highlight_max(axis=1, color="lightgreen"),
-            width="stretch",
-        )
+        with st.expander("Current Q-Matrix", expanded=True):
+            st.dataframe(
+                display_state_1d["q_table"].style.highlight_max(
+                    axis=1, color="lightgreen"
+                ),
+                width="stretch",
+            )
 
         # --- Plot vector field diagram using q matrix ---
-        render_policy_1d(
-            display_state_1d["q_table"],
-            config_tab1["start_pos"],
-            config_tab1["end_pos"],
-            config_tab1["goal_pos"],
-        )
+        with st.expander("Optimal Actions", expanded=True):
+            render_policy_1d(
+                display_state_1d["q_table"],
+                config_tab1["start_pos"],
+                config_tab1["end_pos"],
+                config_tab1["goal_pos"],
+            )
 
     with col_info:
         render_bellman_log(display_state_1d["step_log"])
@@ -263,14 +266,15 @@ with tab_2d:
                 height="content",
             )
         # --- Plot vector field diagram using q matrix ---
-        render_policy_2d(
-            display_state_2d["q_table"],
-            config_tab2["x_start"],
-            config_tab2["x_end"],
-            config_tab2["y_start"],
-            config_tab2["y_end"],
-            (config_tab2["goal_x"], config_tab2["goal_y"]),
-        )
+        with st.expander("Optimal Actions", expanded=True):
+            render_policy_2d(
+                display_state_2d["q_table"],
+                config_tab2["x_start"],
+                config_tab2["x_end"],
+                config_tab2["y_start"],
+                config_tab2["y_end"],
+                (config_tab2["goal_x"], config_tab2["goal_y"]),
+            )
     with col_info_2d:
         render_bellman_log(display_state_2d["step_log"])
 

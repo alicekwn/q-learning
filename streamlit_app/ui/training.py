@@ -81,6 +81,7 @@ def render_training_controls(
             min_value=1,
             value=1,
             key=f"{tab_id}_episodes",
+            help="Note that you can't fast forward episodes in the middle of training an episode step by step. This feature is only available when a complete episode is trained.",
         )
         if st.button("⏩ Fast Forward", key=f"{tab_id}_batch"):
             run_batch_training_fn(n_episodes, config)

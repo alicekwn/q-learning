@@ -16,7 +16,7 @@ def render_bellman_log(history_log: list[dict]) -> None:
     )  # Bellman equation
 
     if not history_log:
-        st.info("Click 'Take Next Step' to see the Q-value updates.")
+        st.info("Train a new episode step by step to see the Q-value updates.")
         return
 
     # Show latest update prominently

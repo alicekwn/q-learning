@@ -121,7 +121,7 @@ def parameters_1d(tab_id: str) -> dict:
     """
     # Row 1: Environment Settings
     with st.expander("🐶 Environment Settings", expanded=True):
-        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1.5])
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
 
         with col1:
             start_pos: int = st.number_input(
@@ -150,17 +150,18 @@ def parameters_1d(tab_id: str) -> dict:
                 "Goal Position (Bone)",
                 min_value=start_pos,
                 max_value=end_pos,
-                value=end_pos,
+                value=end_pos - 1,
                 key=f"{tab_id}_goal_pos",
             )
 
         with col4:
             start_mode: str = st.radio(
-                "Dog Start Mode",
-                ["Fixed", "Randomized"],
+                "Starting position for each episode:",
+                ["Randomised", "Fixed"],
                 index=0,
                 key=f"{tab_id}_start_mode",
                 horizontal=True,
+                help="Choose whether the dog starts at the same fixed position or at a random position for each episode.",
             )
 
         with col5:
@@ -172,10 +173,10 @@ def parameters_1d(tab_id: str) -> dict:
                     max_value=end_pos,
                     value=start_pos,
                     key=f"{tab_id}_fixed_start",
-                    help="Choose whether the dog starts at a fixed position or a random position for each episode.",
+                    help="When the starting position is fixed, the dog will start at the same position for each episode.",
                 )
             else:
-                st.info("Random start each episode")
+                st.info("The starting position is chosen at random for each episode.")
 
     # Row 2: Q-Learning Parameters
     with st.expander("🧠 Q-Learning Parameters", expanded=True):
@@ -261,25 +262,25 @@ def parameters_2d(tab_id: str) -> dict:
                 "Goal position (X axis)",
                 min_value=x_start,
                 max_value=x_end,
-                value=x_end,
+                value=x_end - 1,
                 key=f"{tab_id}_goal_x",
             )
             goal_y: int = st.number_input(
                 "Goal position (Y axis)",
                 min_value=y_start,
                 max_value=y_end,
-                value=y_end,
+                value=y_end - 1,
                 key=f"{tab_id}_goal_y",
             )
 
         with col4:
             start_mode: str = st.radio(
                 "Choose the starting position for each episode:",
-                ["Fixed", "Randomized"],
+                ["Randomised", "Fixed"],
                 index=0,
                 key=f"{tab_id}_start_mode",
                 horizontal=True,
-                help="Choose whether the dog starts at a fixed position or a random position for each episode.",
+                help="Choose whether the dog starts at the same fixed position or a random position for each episode.",
             )
 
             fixed_start_x: int = x_start
@@ -300,7 +301,7 @@ def parameters_2d(tab_id: str) -> dict:
                     key=f"{tab_id}_fixed_start_y",
                 )
             else:
-                st.info("Random start each episode")
+                st.info("The starting position is chosen at random for each episode.")
 
     # Row 2: Q-Learning Parameters
     with st.expander("🧠 Q-Learning Parameters", expanded=True):

@@ -104,7 +104,7 @@ def _create_policy_figure_1d(
     ax.set_ylim(-0.7, 0.5)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title("Greedy Policy: Arrow shows best action at each position")
+    # ax.set_title("Greedy Policy: Arrow shows best action at each position")
 
     plt.tight_layout()
     return fig
@@ -242,9 +242,8 @@ def render_policy_1d(
         end_pos: Ending position of the grid (inclusive)
         goal_pos: Goal position (no arrow shown here)
     """
-    st.subheader(
-        "Optimal Actions",
-        help="Read from the Q-matrix, arrows show the optimal action at each position. (A dot means no learning yet.)",
+    st.markdown(
+        "Read from the Q-matrix, arrows show the optimal action at each position. (A dot means no learning yet.)"
     )
     fig = _create_policy_figure_1d(q_table, start_pos, end_pos, goal_pos)
     st.pyplot(fig)
@@ -267,9 +266,12 @@ def render_policy_2d(
         y_start, y_end: Y-axis range (inclusive)
         goal_pos: (x, y) tuple of goal position
     """
-    st.subheader(
-        "Optimal Actions",
-        help="Read from the Q-matrix, arrows show the optimal action at each position. (A dot means no learning yet. When there are two optimal actions, the vector sum of the two arrows is shown.)",
+    st.markdown(
+        """
+        Read from the Q-matrix, arrows show the optimal action at each position. (A dot means no learning yet.)<br>
+        When there are two optimal actions, the vector sum of the two arrows is shown. (e.g. ➡️+⬆️=↗️)
+        """,
+        unsafe_allow_html=True,
     )
     fig = _create_policy_figure_2d(q_table, x_start, x_end, y_start, y_end, goal_pos)
     st.pyplot(fig)
