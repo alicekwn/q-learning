@@ -95,8 +95,8 @@ def init_session_state(config: dict) -> None:
 def get_start_state(
     mode: str, fixed_pos: int, start_pos: int, end_pos: int, goal_pos: int
 ) -> int:
-    """Get starting state based on mode (Fixed/Randomized)."""
-    if mode == "Randomized":
+    """Get starting state based on mode (Fixed/Randomised)."""
+    if mode == "Randomised":
         possible_starts = [i for i in range(start_pos, end_pos + 1) if i != goal_pos]
         if not possible_starts:
             return start_pos
@@ -583,8 +583,8 @@ def get_start_state_2d(
     y_end: int,
     goal_pos: tuple[int, int],
 ) -> tuple[int, int]:
-    """Get starting state for 2D grid based on mode (Fixed/Randomized)."""
-    if mode == "Randomized":
+    """Get starting state for 2D grid based on mode (Fixed/Randomised)."""
+    if mode == "Randomised":
         possible_starts = [
             (x, y)
             for x in range(x_start, x_end + 1)
