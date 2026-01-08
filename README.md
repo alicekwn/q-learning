@@ -4,7 +4,7 @@ In this repo, Q learning examples are demonstrated, and economics concepts are e
 ## Setup
 
 ```
-git clone https://github.com/zcahkwn/q-learning
+git clone https://github.com/alicekwn/q-learning
 cd q-learning
 ```
 
