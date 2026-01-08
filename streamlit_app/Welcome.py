@@ -24,7 +24,9 @@ Use the sidebar on the left to navigate between the pages:
 
 1. **Introduction** – Overview of Q-learning
 2. **Dog & Bone Example** – interactive demonstration of Q matrix updating under "1D Grid" and "2D Grid" scenarios
-3. **Future Environment** – Placeholder for a more complex setup
-4. **Economics Pricing Example** – application of Q-learning in economics pricing strategies
+3. **Economics Pricing Example** – application of Q-learning in economics pricing strategies
+4. **Future Environment** – Placeholder for a more complex setup
+
+It is recommended to use a desktop computer for the best experience.
 """
 )

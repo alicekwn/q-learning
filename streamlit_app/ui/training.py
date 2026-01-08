@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import streamlit as st
 from streamlit_app.state import jump_to_latest
-from streamlit_app.ui.controls import inline_help, playback_controls
-from streamlit_app.state import is_in_playback_mode, get_display_state
+from streamlit_app.ui.controls import (
+    inline_help,
+    playback_controls,
+    playback_controls_econ,
+)
+from streamlit_app.state_econ import (
+    jump_to_latest_econ,
+    pick_random_starting_prices_econ,
+)
 
-__all__ = ["render_training_controls"]
+__all__ = ["render_training_controls", "render_training_controls_econ"]
 
 
 def render_training_controls(
@@ -120,3 +127,128 @@ def playback_indicator(display_state: dict, in_playback: bool) -> None:
         else:
             desc = f"Episode {meta.get('episode', '0')}, Step {meta.get('step', '0')}"
         st.warning(f"⏪ **Playback Mode** - {desc}")
+
+
+def render_training_controls_econ(
+    config: dict,
+    display_state: dict,
+    in_playback: bool,
+    step_agent_fn,
+    run_batch_training_fn,
+    run_until_convergence_fn,
+) -> None:
+    """Render training controls for economics pricing (buttons, metrics, help, playback).
+
+    Args:
+        config: Configuration dict with 'tab_id' key
+        display_state: Display state dict with 'ready_for_training', 'step_count', 'convergence_info'
+        in_playback: Whether currently in playback mode
+        step_agent_fn: Function to step agent (takes config)
+        run_batch_training_fn: Function to run batch training (takes steps, config)
+        run_until_convergence_fn: Function to run until convergence (takes config)
+    """
+    tab_id = config.get("tab_id", "default")
+    ready = display_state.get("ready_for_training", True)
+    step_count = display_state.get("step_count", 0)
+    convergence_info = display_state.get("convergence_info")
+    starting_prices_picked = display_state.get("starting_prices_picked", True)
+    start_mode = config.get("start_mode", "Randomised")
+
+    # Check if we're at the latest checkpoint (should behave like live mode)
+    checkpoints = st.session_state.get(f"{tab_id}_checkpoints", [])
+    latest_idx = st.session_state.get(
+        f"{tab_id}_latest_checkpoint_index", len(checkpoints) - 1 if checkpoints else -1
+    )
+    latest_idx = min(latest_idx, len(checkpoints) - 1) if checkpoints else -1
+    playback_idx = st.session_state.get(f"{tab_id}_playback_index", -1)
+    at_latest_checkpoint = (
+        in_playback and playback_idx >= latest_idx if latest_idx >= 0 else False
+    )
+
+    # If at latest checkpoint, treat as live mode for button display
+    effective_in_playback = in_playback and not at_latest_checkpoint
+
+    # Check if we need to pick starting prices first (randomized mode)
+    if start_mode == "Randomised" and not starting_prices_picked:
+        if st.button(
+            "🎲 Randomly pick starting price pair",
+            key=f"{tab_id}_pick_starting",
+            disabled=effective_in_playback,
+            type="primary",
+        ):
+            jump_to_latest_econ(config)
+            pick_random_starting_prices_econ(config)
+            st.rerun()
+        st.info("Pick a random starting price pair to begin training.")
+        return
+
+    # Metrics
+    st.metric(
+        label="**Total Steps**:",
+        value=step_count,
+    )
+
+    # Show convergence info if available
+    if convergence_info:
+        if convergence_info.get("converged", False):
+            st.success(
+                f"✅ **Converged!** After {convergence_info['periods_run']:,} steps, "
+                f"policy was stable for {convergence_info['stable_periods']:,} steps. "
+                f"Final ε = {convergence_info['epsilon_final']:.6f}"
+            )
+        else:
+            st.warning(
+                f"⚠️ **Not converged** after {convergence_info['periods_run']:,} steps. "
+                f"Stable for {convergence_info['stable_periods']:,} steps. "
+                f"Final ε = {convergence_info['epsilon_final']:.6f}"
+            )
+
+    # Training controls
+    if not ready or convergence_info is None:
+        # Show "Take Next Step" button (disabled only if in playback mode but not at latest)
+        if st.button(
+            "👟 Take Next Step", key=f"{tab_id}_step", disabled=effective_in_playback
+        ):
+            jump_to_latest_econ(config)
+            step_agent_fn(config)
+            st.rerun()
+
+    # Fast forward section (only when ready and effectively not in playback)
+    if ready and not effective_in_playback:
+        st.markdown("---")
+        st.markdown("**Fast Forward Options:**")
+
+        # Option 1: Fast forward N steps
+        n_steps = st.number_input(
+            "Fast forward this many steps:",
+            min_value=1,
+            max_value=100000,
+            value=1000,
+            step=100,
+            key=f"{tab_id}_fast_steps",
+            help="Run N steps without showing intermediate updates.",
+        )
+
+        if st.button("⏩ Fast Forward N Steps", key=f"{tab_id}_batch_steps"):
+            jump_to_latest_econ(config)
+            run_batch_training_fn(n_steps, config)
+            st.rerun()
+
+        # Option 2: Fast forward until convergence
+        if st.button(
+            "⏯️ Fast Forward Until Convergence",
+            key=f"{tab_id}_converge",
+            help="Run until policy is stable for stable_required steps (or max_periods reached).",
+        ):
+            jump_to_latest_econ(config)
+            run_until_convergence_fn(config)
+            st.rerun()
+
+    st.markdown("---")
+
+    # Playback controls
+    inline_help(
+        "**Playback Controls**",
+        "Use these buttons to navigate through the training history. Each action refers to each time a button is clicked, which could be either a single step or a batch of steps.",
+    )
+    playback_controls_econ(config, in_playback)

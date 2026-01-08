@@ -1,7 +1,9 @@
 import streamlit as st
 
-st.header("Tab 3: Economics Pricing Strategies")
-st.info("This page will have economics pricing strategies.")
+st.header("Future Environment")
+st.info(
+    "This page will feature a more complex environment with different actions and parameters."
+)
 
 col_controls, col_spacer, col_main = st.columns([1, 0.1, 5])
 
@@ -16,5 +18,4 @@ with col_spacer:
     )
 
 with col_main:
-    st.write("Experiment results will go here")
-
+    st.write("Environment visualization will go here")

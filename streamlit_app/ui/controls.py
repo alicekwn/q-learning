@@ -14,7 +14,9 @@ __all__ = [
     "inline_help",
     "parameters_1d",
     "parameters_2d",
+    "parameters_econ",
     "playback_controls",
+    "playback_controls_econ",
 ]
 
 
@@ -325,6 +327,231 @@ def parameters_2d(tab_id: str) -> dict:
     }
 
 
+def parameters_econ(tab_id: str) -> dict:
+    """Render economics pricing controls in horizontal layout with two expander rows.
+
+    Returns a dict with keys:
+      tab_id, k1, k2, c, m, alpha, delta, beta, seed, check_every, stable_required, max_periods
+    """
+    from streamlit_app.state_econ import calculate_prices
+
+    # Row 1: Environment Settings
+    with st.expander("💰 Environment Settings", expanded=True):
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+
+        with col1:
+            k1: float = st.number_input(
+                r"$k_1$",
+                min_value=0.1,
+                max_value=20.0,
+                value=7.0,
+                step=0.1,
+                key=f"{tab_id}_k1",
+                help="Parameter in demand functions: q1 = k1 - p1 + k2 * p2",
+            )
+        with col2:
+            k2: float = st.number_input(
+                r"$k_2$",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.5,
+                step=0.01,
+                key=f"{tab_id}_k2",
+                help="Cross-price parameter in demand functions",
+            )
+        with col3:
+            c: float = st.number_input(
+                r"$c$ (Marginal Cost)",
+                min_value=0.0,
+                max_value=10.0,
+                value=2.0,
+                step=0.1,
+                key=f"{tab_id}_c",
+                help="Marginal cost for both players",
+            )
+        with col4:
+            m_options = [4, 7, 10, 13, 16]
+            m: int = st.select_slider(
+                r"$m$ (Action space size)",
+                options=m_options,
+                value=7,
+                key=f"{tab_id}_m",
+                help="Number of equally spaced prices in the action space. Must be of form 4+3σ for σ=0,1,2,... (i.e., 4, 7, 10, 13, 16,...)",
+            )
+
+        # Calculate and display key prices
+        PRICES = None
+        try:
+            PRICES, p_e, p_c = calculate_prices(k1, k2, c, m)
+            price_start = PRICES[0]
+            price_end = PRICES[-1]
+
+            # Format action space for display (round each price to 1 decimal place)
+            prices_display = [f"{p:.1f}" for p in PRICES]
+            st.info(
+                f"**Equilibrium price** $p_e = {p_e:.2f}$ | "
+                f"**Collusion price** $p_c = {p_c:.2f}$ | "
+                f"**Price range**: [{price_start:.2f}, {price_end:.2f}] | "
+                f"**Action space** $A$ = {{{', '.join(prices_display)}}}"
+            )
+        except Exception as e:
+            st.error(f"Error calculating prices: {e}")
+            # Use defaults
+            PRICES = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+            p_e = 6.0
+            p_c = 8.0
+
+        # Starting prices section
+        st.markdown("---")
+        start_mode: str = st.radio(
+            "Starting prices for initialization:",
+            ["Randomised", "Fixed"],
+            index=0,
+            key=f"{tab_id}_start_mode",
+            horizontal=True,
+            help="Choose whether starting prices are randomized or fixed for each initialization.",
+        )
+
+        # Default fixed prices (middle of range)
+        default_p1 = PRICES[len(PRICES) // 2] if PRICES else 7.0
+        default_p2 = PRICES[len(PRICES) // 2] if PRICES else 7.0
+        fixed_start_p1: float = default_p1
+        fixed_start_p2: float = default_p2
+
+        if start_mode == "Fixed":
+            col_p1, col_p2 = st.columns(2)
+            with col_p1:
+                fixed_start_p1 = st.number_input(
+                    "Fixed starting price for Alice (p1):",
+                    min_value=float(PRICES[0]) if PRICES else 4.0,
+                    max_value=float(PRICES[-1]) if PRICES else 10.0,
+                    value=float(default_p1),
+                    step=0.1,
+                    key=f"{tab_id}_fixed_start_p1",
+                    help="When fixed, Alice will always start at this price.",
+                )
+            with col_p2:
+                fixed_start_p2 = st.number_input(
+                    "Fixed starting price for Bob (p2):",
+                    min_value=float(PRICES[0]) if PRICES else 4.0,
+                    max_value=float(PRICES[-1]) if PRICES else 10.0,
+                    value=float(default_p2),
+                    step=0.1,
+                    key=f"{tab_id}_fixed_start_p2",
+                    help="When fixed, Bob will always start at this price.",
+                )
+
+            # Validate that fixed prices are in PRICES
+            if PRICES:
+                if fixed_start_p1 not in PRICES:
+                    st.warning(
+                        f"⚠️ p1 must be in the action space: {[f'{p:.1f}' for p in PRICES]}"
+                    )
+                if fixed_start_p2 not in PRICES:
+                    st.warning(
+                        f"⚠️ p2 must be in the action space: {[f'{p:.1f}' for p in PRICES]}"
+                    )
+        else:
+            st.info(
+                "Starting prices will be chosen randomly from the action space for each initialization."
+            )
+
+    # Row 2: Q-Learning Parameters
+    with st.expander("🧠 Q-Learning Parameters", expanded=True):
+        col_a, col_d, col_b = st.columns([1, 1, 1])
+
+        with col_a:
+            alpha: float = st.slider(
+                r"$\alpha$ (Learning Rate)",
+                0.0,
+                1.0,
+                0.125,
+                0.001,
+                key=f"{tab_id}_alpha",
+            )
+        with col_d:
+            delta: float = st.slider(
+                r"$\delta$ (Discount Factor)",
+                0.0,
+                1.0,
+                0.95,
+                0.01,
+                key=f"{tab_id}_delta",
+            )
+        with col_b:
+            beta: float = st.number_input(
+                r"$\beta$ (Exponential Decay Rate)",
+                min_value=0.0,
+                max_value=1e-3,
+                value=2e-5,
+                step=1e-6,
+                format="%.6f",
+                key=f"{tab_id}_beta",
+                help="Exploration rate decays as ε_t = exp(-β * t)",
+            )
+
+    # Advanced parameters (collapsed by default)
+    with st.expander("⚙️ Advanced Parameters", expanded=False):
+        col_seed, col_check, col_stable, col_max = st.columns([1, 1, 1, 1])
+
+        with col_seed:
+            seed: int = st.number_input(
+                "Random Seed",
+                min_value=0,
+                max_value=1000,
+                value=43,
+                key=f"{tab_id}_seed",
+            )
+        with col_check:
+            check_every: int = st.number_input(
+                "Check Every",
+                min_value=100,
+                max_value=10000,
+                value=1000,
+                step=100,
+                key=f"{tab_id}_check_every",
+                help="Check policy stability every N steps",
+            )
+        with col_stable:
+            stable_required: int = st.number_input(
+                "Stable Required",
+                min_value=1000,
+                max_value=1000000,
+                value=100000,
+                step=10000,
+                key=f"{tab_id}_stable_required",
+                help="Number of stable steps required for convergence",
+            )
+        with col_max:
+            max_periods: int = st.number_input(
+                "Max Periods",
+                min_value=10000,
+                max_value=10000000,
+                value=2000000,
+                step=100000,
+                key=f"{tab_id}_max_periods",
+                help="Maximum number of steps before stopping",
+            )
+
+    return {
+        "tab_id": tab_id,
+        "k1": k1,
+        "k2": k2,
+        "c": c,
+        "m": m,
+        "alpha": alpha,
+        "delta": delta,
+        "beta": beta,
+        "seed": seed,
+        "check_every": check_every,
+        "stable_required": stable_required,
+        "max_periods": max_periods,
+        "start_mode": start_mode,
+        "fixed_start_p1": fixed_start_p1,
+        "fixed_start_p2": fixed_start_p2,
+    }
+
+
 def playback_controls(config: dict, in_playback: bool) -> None:
     """Render playback controls for navigating through training history.
 
@@ -367,4 +594,82 @@ def playback_controls(config: dict, in_playback: bool) -> None:
             "⏭️ Latest action", key=f"{tab_id}_latest", disabled=not in_playback
         ):
             jump_to_latest(config)
+            st.rerun()
+
+
+def playback_controls_econ(config: dict, in_playback: bool) -> None:
+    """Render playback controls for navigating through training history (economics version).
+
+    Args:
+        config: Configuration dict with 'tab_id' key
+        in_playback: Whether currently in playback mode
+    """
+    from streamlit_app.state_econ import (
+        rewind_checkpoint_econ,
+        forward_checkpoint_econ,
+        jump_to_latest_econ,
+        jump_to_start_econ,
+        get_display_state_econ,
+    )
+
+    tab_id = config.get("tab_id", "default")
+
+    col_start, col_prev, col_next, col_latest = st.columns([1, 1, 1, 1])
+
+    checkpoints = st.session_state.get(f"{tab_id}_checkpoints", [])
+
+    # Get current display state to check step_count
+    display_state = get_display_state_econ(config)
+    step_count = display_state.get("step_count", 0)
+
+    # Determine button states
+    # Prev and Initial: disabled when step_count = 0 or no checkpoints
+    no_actions_taken = len(checkpoints) <= 1
+    at_step_zero = step_count == 0
+    prev_disabled = no_actions_taken or at_step_zero
+
+    # Next and Latest: disabled when not in playback mode OR when at the latest checkpoint
+    # Get the latest checkpoint index to check if we're at the latest
+    latest_idx = st.session_state.get(
+        f"{tab_id}_latest_checkpoint_index", len(checkpoints) - 1 if checkpoints else -1
+    )
+    latest_idx = min(latest_idx, len(checkpoints) - 1) if checkpoints else -1
+
+    if in_playback:
+        playback_idx = st.session_state.get(f"{tab_id}_playback_index", -1)
+        # If we're at the latest checkpoint (or beyond), disable Next and Latest
+        at_latest_checkpoint = playback_idx >= latest_idx if latest_idx >= 0 else False
+        next_disabled = at_latest_checkpoint
+        latest_disabled = at_latest_checkpoint
+    else:
+        # Not in playback mode (live mode) - buttons should be disabled
+        next_disabled = True
+        latest_disabled = True
+
+    with col_start:
+        if st.button(
+            "⏮️ Initial State", key=f"{tab_id}_start_econ", disabled=prev_disabled
+        ):
+            jump_to_start_econ(config)
+            st.rerun()
+
+    with col_prev:
+        if st.button(
+            "◀️ Prev action", key=f"{tab_id}_rewind_econ", disabled=prev_disabled
+        ):
+            rewind_checkpoint_econ(config)
+            st.rerun()
+
+    with col_next:
+        if st.button(
+            "▶️ Next action", key=f"{tab_id}_forward_econ", disabled=next_disabled
+        ):
+            forward_checkpoint_econ(config)
+            st.rerun()
+
+    with col_latest:
+        if st.button(
+            "⏭️ Latest action", key=f"{tab_id}_latest_econ", disabled=latest_disabled
+        ):
+            jump_to_latest_econ(config)
             st.rerun()

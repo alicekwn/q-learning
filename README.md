@@ -98,7 +98,6 @@ print(f"Path: {path}")
 ### Notebooks
 
 Research notebooks are in `notebooks/`:
-- `line_example.ipynb` - 1D line-world Q-learning examples
-- `grid_example.ipynb` - 2D grid-world experiments
+- `1d_grid_example.ipynb` - a dog moving in a 1D grid example
+- `2d_grid_example.ipynb` - a dog moving in a 2D grid example
 - `econ_game.ipynb` - Economic game theory applications
-
