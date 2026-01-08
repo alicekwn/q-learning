@@ -96,7 +96,7 @@ with tab_1:
 with tab_2:
 
     st.header("Demo of Q-value update in Economics Pricing Scenario")
-    st.info(
+    st.markdown(
         "This section demonstrates how the Q-value updates in this economics pricing scenario. "
         "You can step through the training process and observe how both players learn optimal pricing strategies."
     )
