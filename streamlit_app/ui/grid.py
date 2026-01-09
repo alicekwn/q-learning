@@ -54,7 +54,7 @@ def render_grid_1d(
                 unsafe_allow_html=True,
             )
 
-    # Only show path when actively training
+    # Only show path when actively training or after goal is reached
     if show_path:
         st.write(f"**Current Path:** {path}")
 

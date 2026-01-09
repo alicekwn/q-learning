@@ -172,6 +172,10 @@ with tab_1d:
         Hence starting position being randomised is more preferred.
         """
         )
+    autoplay_pending_key = f"{config_tab1.get('tab_id', 'tab1')}_autoplay_pending_rerun"
+    if st.session_state.get(autoplay_pending_key, False):
+        st.session_state[autoplay_pending_key] = False
+        st.rerun()
 
 
 # ==============================================================================
@@ -232,7 +236,7 @@ with tab_2d:
                 show_path=not ready_2d,
                 show_dog=show_dog_2d,
             )
-        # Only show path when actively training
+        # Only show path when actively training or when '🎉 Goal Reached! Episode 1 complete.' is shown
         if not ready_2d:
             st.write(f"**Current Path:** {display_state_2d['current_path']}")
 
@@ -300,3 +304,7 @@ with tab_2d:
         No, as more episodes are trained (more than 10000 episodes in this case), the Q matrix will converge to the same values each time the model is trained, regardless of the starting position. At first, when less episodes are trained, the Q matrix might show only one optimal action for each state. But as the model learns, there might be 2 optimal actions for some states, indicating that either path is optimal. 
         """
         )
+    autoplay_pending_key = f"{config_tab2.get('tab_id', 'tab2')}_autoplay_pending_rerun"
+    if st.session_state.get(autoplay_pending_key, False):
+        st.session_state[autoplay_pending_key] = False
+        st.rerun()

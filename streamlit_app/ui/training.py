@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import streamlit as st
 from streamlit_app.state import jump_to_latest
 from streamlit_app.ui.controls import (
@@ -15,6 +16,64 @@ from streamlit_app.state_econ import (
 )
 
 __all__ = ["render_training_controls", "render_training_controls_econ"]
+
+
+def handle_autoplay(
+    config: dict,
+    display_state: dict,
+    step_agent_fn,
+) -> None:
+    """Handle autoplay logic: check if autoplay is active and take steps automatically.
+
+    Args:
+        config: Configuration dict with 'tab_id' key
+        display_state: Display state dict with 'ready_for_episode', 'is_terminal'
+        step_agent_fn: Function to step agent (takes config)
+    """
+    tab_id = config.get("tab_id", "default")
+    autoplay_key = f"{tab_id}_autoplay_active"
+    autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
+    autoplay_pending_rerun_key = f"{tab_id}_autoplay_pending_rerun"
+    autoplay_delay = 0.5  # seconds between steps
+
+    # Check if autoplay is active
+    if st.session_state.get(autoplay_key, False):
+        ready = display_state.get("ready_for_episode", True)
+
+        # If episode is already complete, stop autoplay
+        if ready:
+            st.session_state[autoplay_key] = False
+            if autoplay_last_step_key in st.session_state:
+                del st.session_state[autoplay_last_step_key]
+            st.session_state[autoplay_pending_rerun_key] = False
+            return
+
+        # Check if enough time has passed since last step
+        current_time = time.time()
+        last_step_time = st.session_state.get(autoplay_last_step_key, 0)
+        time_since_last_step = current_time - last_step_time
+
+        if time_since_last_step < autoplay_delay:
+            time.sleep(autoplay_delay - time_since_last_step)
+
+        # Take exactly one step per run so the grid and log update together
+        jump_to_latest(config)
+        step_agent_fn(config)
+
+        # Update last step time
+        st.session_state[autoplay_last_step_key] = time.time()
+
+        # Check if episode is now complete after taking the step
+        # (step_agent_fn may have completed the episode)
+        ready_after_step = st.session_state.get(f"{tab_id}_ready_for_episode", True)
+        if ready_after_step:
+            # Episode completed, stop autoplay
+            st.session_state[autoplay_key] = False
+            if autoplay_last_step_key in st.session_state:
+                del st.session_state[autoplay_last_step_key]
+            st.session_state[autoplay_pending_rerun_key] = False
+        else:
+            st.session_state[autoplay_pending_rerun_key] = True
 
 
 def render_training_controls(
@@ -37,6 +96,13 @@ def render_training_controls(
     """
     tab_id = config.get("tab_id", "default")
     ready = display_state.get("ready_for_episode", True)
+
+    # Handle autoplay if active (before rendering buttons)
+    # This needs to happen early so autoplay can continue on each rerun
+    if not ready:
+        handle_autoplay(config, display_state, step_agent_fn)
+        # After handle_autoplay, ready state may have changed, so refresh it from session state
+        ready = st.session_state.get(f"{tab_id}_ready_for_episode", True)
 
     # Metrics
     total_episodes_key = f"{tab_id}_total_episodes"
@@ -70,15 +136,52 @@ def render_training_controls(
             key=f"{tab_id}_new_episode",
             disabled=in_playback,
         ):
+            # Stop autoplay when starting a new episode
+            autoplay_key = f"{tab_id}_autoplay_active"
+            autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
+            if autoplay_key in st.session_state:
+                st.session_state[autoplay_key] = False
+            if autoplay_last_step_key in st.session_state:
+                del st.session_state[autoplay_last_step_key]
             jump_to_latest(config)
             reset_episode_fn(config)
             st.rerun()
     else:
-        # Not ready: show "Take Next Step" button
-        if st.button("👟 Take Next Step", key=f"{tab_id}_step", disabled=in_playback):
-            jump_to_latest(config)
-            step_agent_fn(config)
-            st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            # Not ready: show "Take Next Step" button
+            if st.button(
+                "👟 Take Next Step", key=f"{tab_id}_step", disabled=in_playback
+            ):
+                # Stop autoplay if manually stepping
+                autoplay_key = f"{tab_id}_autoplay_active"
+                autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
+                if autoplay_key in st.session_state:
+                    st.session_state[autoplay_key] = False
+                if autoplay_last_step_key in st.session_state:
+                    del st.session_state[autoplay_last_step_key]
+                jump_to_latest(config)
+                step_agent_fn(config)
+                st.rerun()
+        with col2:
+            autoplay_key = f"{tab_id}_autoplay_active"
+            if st.button(
+                "Autoplay to complete this episode",
+                key=f"{tab_id}_autoplay",
+                disabled=in_playback,
+            ):
+                # Start autoplay
+                autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
+                autoplay_pending_rerun_key = f"{tab_id}_autoplay_pending_rerun"
+                st.session_state[autoplay_key] = True
+                # Reset timer and take first step immediately
+                jump_to_latest(config)
+                step_agent_fn(config)
+                st.session_state[autoplay_last_step_key] = time.time()
+                ready_after_step = st.session_state.get(
+                    f"{tab_id}_ready_for_episode", True
+                )
+                st.session_state[autoplay_pending_rerun_key] = not ready_after_step
 
     # Fast forward section
     if ready and not in_playback:
@@ -91,6 +194,13 @@ def render_training_controls(
             help="Note that you can't fast forward episodes in the middle of training an episode step by step. This feature is only available when a complete episode is trained.",
         )
         if st.button("⏩ Fast Forward", key=f"{tab_id}_batch"):
+            # Stop autoplay when fast forwarding
+            autoplay_key = f"{tab_id}_autoplay_active"
+            autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
+            if autoplay_key in st.session_state:
+                st.session_state[autoplay_key] = False
+            if autoplay_last_step_key in st.session_state:
+                del st.session_state[autoplay_last_step_key]
             run_batch_training_fn(n_episodes, config)
             st.rerun()
 
