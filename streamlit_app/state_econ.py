@@ -105,9 +105,7 @@ def argmax_tie(x: np.ndarray, rng: np.random.Generator) -> int:
     return int(rng.choice(idxs))
 
 
-def greedy_map(
-    Q: np.ndarray, PRICES: list[float], rng: np.random.Generator
-) -> np.ndarray:
+def greedy_map(Q: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Returns an array of length N_STATES with best-action indices."""
     N_STATES = Q.shape[0]
     return np.array([argmax_tie(Q[s_], rng) for s_ in range(N_STATES)], dtype=int)
@@ -211,8 +209,8 @@ def init_session_state_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_step_count"] = 0
 
     # Convergence tracking
-    st.session_state[f"{tab_id}_prev_pi1"] = greedy_map(Q1, PRICES, rng)
-    st.session_state[f"{tab_id}_prev_pi2"] = greedy_map(Q2, PRICES, rng)
+    st.session_state[f"{tab_id}_prev_pi1"] = greedy_map(Q1, rng)
+    st.session_state[f"{tab_id}_prev_pi2"] = greedy_map(Q2, rng)
     st.session_state[f"{tab_id}_stable_count"] = 0
     st.session_state[f"{tab_id}_cfg_check_every"] = config.get("check_every", 1000)
     st.session_state[f"{tab_id}_cfg_stable_required"] = config.get(
@@ -283,7 +281,6 @@ def step_agent_econ(config: dict) -> None:
     # Get configuration
     PRICES = st.session_state[f"{tab_id}_PRICES"]
     N_ACTIONS = st.session_state[f"{tab_id}_N_ACTIONS"]
-    N_STATES = st.session_state[f"{tab_id}_N_STATES"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
@@ -432,8 +429,8 @@ def step_agent_econ(config: dict) -> None:
     # Check convergence (every check_every steps)
     check_every = st.session_state[f"{tab_id}_cfg_check_every"]
     if step_count % check_every == 0:
-        current_pi1 = greedy_map(Q1, PRICES, rng)
-        current_pi2 = greedy_map(Q2, PRICES, rng)
+        current_pi1 = greedy_map(Q1, rng)
+        current_pi2 = greedy_map(Q2, rng)
         prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
         prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
 
@@ -498,7 +495,7 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
     start_step = step_count + 1
 
     # Run steps
-    for i in range(steps_to_run):
+    for _ in range(steps_to_run):
         step_count += 1
 
         # Check max periods
@@ -539,8 +536,8 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
 
         # Check convergence
         if step_count % check_every == 0:
-            current_pi1 = greedy_map(Q1, PRICES, rng)
-            current_pi2 = greedy_map(Q2, PRICES, rng)
+            current_pi1 = greedy_map(Q1, rng)
+            current_pi2 = greedy_map(Q2, rng)
             prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
             prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
 
@@ -667,8 +664,8 @@ def run_until_convergence_econ(config: dict) -> None:
 
         # Check convergence
         if step_count % check_every == 0:
-            current_pi1 = greedy_map(Q1, PRICES, rng)
-            current_pi2 = greedy_map(Q2, PRICES, rng)
+            current_pi1 = greedy_map(Q1, rng)
+            current_pi2 = greedy_map(Q2, rng)
             prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
             prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
 

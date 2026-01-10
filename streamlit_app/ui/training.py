@@ -146,7 +146,7 @@ def render_training_controls(
             reset_episode_fn(config)
             st.rerun()
     else:
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([1, 2])
         with col1:
             # Not ready: show "Take Next Step" button
             if st.button(
@@ -165,7 +165,7 @@ def render_training_controls(
         with col2:
             autoplay_key = f"{tab_id}_autoplay_active"
             if st.button(
-                "Autoplay to complete this episode",
+                "⏩ Autoplay to complete this episode step by step",
                 key=f"{tab_id}_autoplay",
                 disabled=in_playback,
             ):

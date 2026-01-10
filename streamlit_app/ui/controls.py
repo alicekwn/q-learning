@@ -1,14 +1,21 @@
 """Streamlit sidebar & control widgets for dog and bone demo."""
 
 from __future__ import annotations
+import streamlit as st
 from streamlit_app.state import (
     rewind_checkpoint,
     forward_checkpoint,
     jump_to_latest,
     jump_to_start,
 )
-
-import streamlit as st
+from streamlit_app.state_econ import (
+    rewind_checkpoint_econ,
+    forward_checkpoint_econ,
+    jump_to_latest_econ,
+    jump_to_start_econ,
+    get_display_state_econ,
+    calculate_prices,
+)
 
 __all__ = [
     "inline_help",
@@ -333,7 +340,6 @@ def parameters_econ(tab_id: str) -> dict:
     Returns a dict with keys:
       tab_id, k1, k2, c, m, alpha, delta, beta, seed, check_every, stable_required, max_periods
     """
-    from streamlit_app.state_econ import calculate_prices
 
     # Row 1: Environment Settings
     with st.expander("💰 Environment Settings", expanded=True):
@@ -382,7 +388,7 @@ def parameters_econ(tab_id: str) -> dict:
         # Calculate and display key prices
         PRICES = None
         try:
-            PRICES, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
+            PRICES, p_e, p_c, _, _ = calculate_prices(k1, k2, c, m)
             price_start = PRICES[0]
             price_end = PRICES[-1]
 
@@ -604,13 +610,6 @@ def playback_controls_econ(config: dict, in_playback: bool) -> None:
         config: Configuration dict with 'tab_id' key
         in_playback: Whether currently in playback mode
     """
-    from streamlit_app.state_econ import (
-        rewind_checkpoint_econ,
-        forward_checkpoint_econ,
-        jump_to_latest_econ,
-        jump_to_start_econ,
-        get_display_state_econ,
-    )
 
     tab_id = config.get("tab_id", "default")
 
