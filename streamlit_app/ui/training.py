@@ -20,14 +20,14 @@ __all__ = ["render_training_controls", "render_training_controls_econ"]
 
 def handle_autoplay(
     config: dict,
-    display_state: dict,
+    _display_state: dict,  # Unused but kept for API consistency
     step_agent_fn,
 ) -> None:
     """Handle autoplay logic: check if autoplay is active and take steps automatically.
 
     Args:
         config: Configuration dict with 'tab_id' key
-        display_state: Display state dict with 'ready_for_episode', 'is_terminal'
+        _display_state: Display state dict (unused but kept for API consistency)
         step_agent_fn: Function to step agent (takes config)
     """
     tab_id = config.get("tab_id", "default")
@@ -38,16 +38,6 @@ def handle_autoplay(
 
     # Check if autoplay is active
     if st.session_state.get(autoplay_key, False):
-        ready = display_state.get("ready_for_episode", True)
-
-        # If episode is already complete, stop autoplay
-        if ready:
-            st.session_state[autoplay_key] = False
-            if autoplay_last_step_key in st.session_state:
-                del st.session_state[autoplay_last_step_key]
-            st.session_state[autoplay_pending_rerun_key] = False
-            return
-
         # Check if enough time has passed since last step
         current_time = time.time()
         last_step_time = st.session_state.get(autoplay_last_step_key, 0)
@@ -57,6 +47,7 @@ def handle_autoplay(
             time.sleep(autoplay_delay - time_since_last_step)
 
         # Take exactly one step per run so the grid and log update together
+        # This step will move the agent closer to or reach the goal
         jump_to_latest(config)
         step_agent_fn(config)
 
@@ -64,15 +55,21 @@ def handle_autoplay(
         st.session_state[autoplay_last_step_key] = time.time()
 
         # Check if episode is now complete after taking the step
-        # (step_agent_fn may have completed the episode)
+        # (step_agent_fn may have completed the episode and reached the goal)
         ready_after_step = st.session_state.get(f"{tab_id}_ready_for_episode", True)
-        if ready_after_step:
-            # Episode completed, stop autoplay
+        is_terminal_after_step = st.session_state.get(f"{tab_id}_is_terminal", True)
+
+        if ready_after_step and is_terminal_after_step:
+            # Episode completed and goal reached, stop autoplay
             st.session_state[autoplay_key] = False
             if autoplay_last_step_key in st.session_state:
                 del st.session_state[autoplay_last_step_key]
-            st.session_state[autoplay_pending_rerun_key] = False
+            # Trigger one final rerun to ensure the completed state with goal reached is displayed
+            # This ensures the user sees "🎉 Goal Reached! Episode xx complete." message
+            st.session_state[autoplay_pending_rerun_key] = True
         else:
+            # Episode not complete yet, continue autoplay on next rerun
+            # The step was taken, so we need another rerun to continue
             st.session_state[autoplay_pending_rerun_key] = True
 
 
@@ -95,11 +92,13 @@ def render_training_controls(
         run_batch_training_fn: Function to run batch training (takes episodes, config)
     """
     tab_id = config.get("tab_id", "default")
+    autoplay_key = f"{tab_id}_autoplay_active"
     ready = display_state.get("ready_for_episode", True)
 
     # Handle autoplay if active (before rendering buttons)
     # This needs to happen early so autoplay can continue on each rerun
-    if not ready:
+    # Check if autoplay is active (not just if ready=False) so autoplay can complete the final step
+    if st.session_state.get(autoplay_key, False):
         handle_autoplay(config, display_state, step_agent_fn)
         # After handle_autoplay, ready state may have changed, so refresh it from session state
         ready = st.session_state.get(f"{tab_id}_ready_for_episode", True)

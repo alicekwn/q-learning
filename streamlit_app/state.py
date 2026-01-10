@@ -85,6 +85,9 @@ def init_session_state(config: dict) -> None:
     st.session_state[f"{tab_id}_steps_per_episode"] = (
         []
     )  # Steps taken in each completed episode
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+        False
+    )  # Track if episode completed via step-by-step/autoplay vs batch
 
     record_q_history(config)
 
@@ -123,6 +126,7 @@ def reset_episode(config: dict) -> None:
     st.session_state[f"{tab_id}_is_terminal"] = start_s == config["goal_pos"]
     st.session_state[f"{tab_id}_episode_start"] = start_s  # Track episode start
     st.session_state[f"{tab_id}_ready_for_episode"] = False  # Now training this episode
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Reset flag for new episode
     # Don't clear step_log - keep history across episodes
 
     # Save initial checkpoint for this episode (allows rewind to start)
@@ -179,6 +183,9 @@ def save_checkpoint(config: dict, action_type: str, metadata: dict = None) -> No
         "step_log_count": len(
             st.session_state[f"{tab_id}_step_log"]
         ),  # Track how many log entries at this checkpoint
+        "episode_completed_via_step": st.session_state.get(
+            f"{tab_id}_episode_completed_via_step", False
+        ),
         "metadata": metadata or {},
     }
 
@@ -287,6 +294,7 @@ def step_agent(config: dict) -> None:
 
         st.session_state[f"{tab_id}_total_episodes"] += 1
         st.session_state[f"{tab_id}_ready_for_episode"] = True  # Ready for next episode
+        st.session_state[f"{tab_id}_episode_completed_via_step"] = True  # Completed via step-by-step/autoplay
         record_q_history(config)
 
     # Save checkpoint for this user action
@@ -381,6 +389,7 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
     # After batch, set to ready state (terminal, ready for next action)
     st.session_state[f"{tab_id}_is_terminal"] = True
     st.session_state[f"{tab_id}_ready_for_episode"] = True  # Ready for next action
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Completed via batch training
 
     # Save single checkpoint for entire batch
     save_checkpoint(config, "batch", {"episodes": episodes_to_run})
@@ -412,6 +421,9 @@ def get_display_state(config: dict) -> dict:
             "steps_per_episode": st.session_state.get(
                 f"{tab_id}_steps_per_episode", []
             ),
+            "episode_completed_via_step": st.session_state.get(
+                f"{tab_id}_episode_completed_via_step", False
+            ),
             "is_live": True,
         }
 
@@ -441,6 +453,7 @@ def get_display_state(config: dict) -> dict:
         "ready_for_episode": checkpoint.get("ready_for_episode", True),
         "is_terminal": checkpoint.get("is_terminal", True),
         "steps_per_episode": checkpoint.get("steps_per_episode", []),
+        "episode_completed_via_step": checkpoint.get("episode_completed_via_step", False),
         "action_type": checkpoint["type"],
         "metadata": checkpoint["metadata"],
         "is_live": False,
@@ -569,6 +582,7 @@ def init_session_state_2d(config: dict) -> None:
     st.session_state[f"{tab_id}_total_episodes"] = 0
     st.session_state[f"{tab_id}_playback_index"] = -1
     st.session_state[f"{tab_id}_steps_per_episode"] = []
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Track if episode completed via step-by-step/autoplay vs batch
 
     record_q_history_2d(config)
     save_checkpoint(config, "init", {"description": "Initial state"})
@@ -617,6 +631,7 @@ def reset_episode_2d(config: dict) -> None:
     st.session_state[f"{tab_id}_is_terminal"] = start_s == goal_pos
     st.session_state[f"{tab_id}_episode_start"] = start_s
     st.session_state[f"{tab_id}_ready_for_episode"] = False
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Reset flag for new episode
 
     save_checkpoint(
         config,
@@ -744,6 +759,7 @@ def step_agent_2d(config: dict) -> None:
 
         st.session_state[f"{tab_id}_total_episodes"] += 1
         st.session_state[f"{tab_id}_ready_for_episode"] = True
+        st.session_state[f"{tab_id}_episode_completed_via_step"] = True  # Completed via step-by-step/autoplay
         record_q_history_2d(config)
 
     save_checkpoint(
@@ -828,5 +844,6 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
 
     st.session_state[f"{tab_id}_is_terminal"] = True
     st.session_state[f"{tab_id}_ready_for_episode"] = True
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Completed via batch training
 
     save_checkpoint(config, "batch", {"episodes": episodes_to_run})

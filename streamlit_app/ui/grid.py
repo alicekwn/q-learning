@@ -15,6 +15,7 @@ def render_grid_1d(
     path: list[int],
     show_path: bool = True,
     show_dog: bool = True,
+    show_final_path: bool = False,
 ) -> None:
     """Render 1D grid with emoji indicators and globally centered text.
 
@@ -26,6 +27,7 @@ def render_grid_1d(
         path: List of positions visited
         show_path: Whether to display the path below the grid
         show_dog: Whether to display the dog emoji at current position
+        show_final_path: Whether to show path when episode completes via step-by-step
     """
     st.subheader("1D Grid")
 
@@ -54,8 +56,8 @@ def render_grid_1d(
                 unsafe_allow_html=True,
             )
 
-    # Only show path when actively training or after goal is reached
-    if show_path:
+    # Show path when actively training or when episode completes via step-by-step
+    if show_path or show_final_path:
         st.write(f"**Current Path:** {path}")
 
 
@@ -69,6 +71,7 @@ def render_grid_2d(
     path: list[tuple[int, int]],
     show_path: bool = True,
     show_dog: bool = True,
+    show_final_path: bool = False,
 ) -> None:
     """Render 2D grid with emoji indicators using Cartesian coordinates.
 
@@ -82,6 +85,7 @@ def render_grid_2d(
         path: List of (x, y) tuples showing the path taken
         show_path: Whether to display the path below the grid
         show_dog: Whether to display the dog emoji at current position
+        show_final_path: Whether to show path when episode completes via step-by-step
     """
 
     # Calculate grid dimensions
@@ -112,3 +116,7 @@ def render_grid_2d(
         """<style>div[data-testid='stVerticalBlock'] > div > div {text-align: center;}</style>""",
         unsafe_allow_html=True,
     )
+
+    # Show path when actively training or when episode completes via step-by-step
+    if show_path or show_final_path:
+        st.write(f"**Current Path:** {path}")

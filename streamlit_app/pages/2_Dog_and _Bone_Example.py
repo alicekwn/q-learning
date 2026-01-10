@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent  # project root
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from streamlit_app.ui.controls import parameters_1d, parameters_2d, inline_help
+from streamlit_app.ui.controls import parameters_1d, parameters_2d
 from streamlit_app.ui.training import render_training_controls
 from streamlit_app.ui.grid import render_grid_1d, render_grid_2d
 from streamlit_app.ui.bellman import render_bellman_log
@@ -86,8 +86,18 @@ with tab_1d:
 
     # --- B. GRID ---
     ready = display_state_1d.get("ready_for_episode", True)
-    # Show dog if Fixed mode OR if training has started (not ready)
-    show_dog = (config_tab1["start_mode"] == "Fixed") or (not ready)
+    is_terminal = display_state_1d.get("is_terminal", True)
+    episode_completed_via_step = display_state_1d.get(
+        "episode_completed_via_step", False
+    )
+    # Show dog if Fixed mode OR if training has started (not ready) OR if episode just completed via step-by-step/autoplay
+    show_dog = (
+        (config_tab1["start_mode"] == "Fixed")
+        or (not ready)
+        or (ready and is_terminal and episode_completed_via_step)
+    )
+    # Show final path when episode completes via step-by-step/autoplay
+    show_final_path = ready and is_terminal and episode_completed_via_step
     render_grid_1d(
         config_tab1["start_pos"],
         config_tab1["end_pos"],
@@ -96,6 +106,7 @@ with tab_1d:
         display_state_1d["current_path"],
         show_path=not ready,
         show_dog=show_dog,
+        show_final_path=show_final_path,
     )
     playback_indicator(display_state_1d, in_playback_1d)
 
@@ -217,13 +228,27 @@ with tab_2d:
     in_playback_2d = is_in_playback_mode(config_tab2)
 
     # --- B. GRID & Training Controls & Playback Controls ---
-    col_spacer_2d, header_2d, col_grid_2d, col_spacer_2d = st.columns([0.2, 1, 4, 0.5])
+    col_spacer_left, header_2d, col_grid_2d, col_spacer_right = st.columns(
+        [0.2, 1, 4, 0.5]
+    )
     with header_2d:
         st.subheader("2D Grid")
     with col_grid_2d:
         ready_2d = display_state_2d.get("ready_for_episode", True)
-        # Show dog if Fixed starting position mode OR if training has started (not ready)
-        show_dog_2d = (config_tab2["start_mode"] == "Fixed") or (not ready_2d)
+        is_terminal_2d = display_state_2d.get("is_terminal", True)
+        episode_completed_via_step_2d = display_state_2d.get(
+            "episode_completed_via_step", False
+        )
+        # Show dog if Fixed starting position mode OR if training has started (not ready) OR if episode just completed via step-by-step/autoplay
+        show_dog_2d = (
+            (config_tab2["start_mode"] == "Fixed")
+            or (not ready_2d)
+            or (ready_2d and is_terminal_2d and episode_completed_via_step_2d)
+        )
+        # Show final path when episode completes via step-by-step/autoplay
+        show_final_path_2d = (
+            ready_2d and is_terminal_2d and episode_completed_via_step_2d
+        )
         with st.expander("Visualization", expanded=True):
             render_grid_2d(
                 config_tab2["x_start"],
@@ -235,16 +260,11 @@ with tab_2d:
                 display_state_2d["current_path"],
                 show_path=not ready_2d,
                 show_dog=show_dog_2d,
+                show_final_path=show_final_path_2d,
             )
-        # Only show path when actively training or when '🎉 Goal Reached! Episode 1 complete.' is shown
-        if not ready_2d:
-            st.write(f"**Current Path:** {display_state_2d['current_path']}")
 
     # Render playback indicator
     playback_indicator(display_state_2d, in_playback_2d)
-
-    with col_spacer_2d:
-        st.markdown(" ")
 
     st.markdown("---")
     # --- C. Q-TABLE & Q-VALUES PLOT AREA ---
