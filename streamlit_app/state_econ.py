@@ -22,6 +22,7 @@ __all__ = [
     "forward_checkpoint_econ",
     "jump_to_latest_econ",
     "jump_to_start_econ",
+    "flip_q_table_states",
 ]
 
 
@@ -91,6 +92,33 @@ def index_to_state(s: int, PRICES: list[float]) -> tuple[float, float]:
     i = s // N_ACTIONS
     j = s % N_ACTIONS
     return PRICES[i], PRICES[j]
+
+
+def flip_q_table_states(Q: np.ndarray, PRICES: list[float]) -> np.ndarray:
+    """Flip state indices in a Q-table from s(p1, p2) to s(p2, p1).
+
+    This function is used when a Q-table trained from one player's perspective
+    needs to be used from another player's perspective. It transforms all states
+    by swapping p1 and p2 in the state encoding.
+
+    Args:
+        Q: Q-table array of shape (N_STATES, N_ACTIONS) where N_STATES = len(PRICES)^2
+        PRICES: List of price values used to encode states
+
+    Returns:
+        A new Q-table with flipped state indices. Q_flipped[s_flipped] = Q[s]
+        where s_flipped is the state index for s(p2, p1) when s was for s(p1, p2).
+    """
+    N_STATES = Q.shape[0]
+    Q_flipped = np.zeros_like(Q)
+
+    for s in range(N_STATES):
+        p1, p2 = index_to_state(s, PRICES)
+        # Intentionally swap p1 and p2 to flip state perspective
+        s_flipped = state_index(p2, p1, PRICES)  # type: ignore[arg-type]
+        Q_flipped[s_flipped] = Q[s]  # Copy Q-values to flipped state
+
+    return Q_flipped
 
 
 def epsilon_at(step: int, beta: float) -> float:
