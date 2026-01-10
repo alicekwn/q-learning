@@ -50,17 +50,23 @@ def profit2(p1: float, p2: float, c: float, k1: float, k2: float) -> float:
 
 def calculate_prices(
     k1: float, k2: float, c: float, m: int
-) -> tuple[list[float], float, float]:
+) -> tuple[list[float], float, float, float, float]:
     """Calculate equilibrium price, collusion price, and action space.
 
     Returns:
-        (PRICES list, p_e (equilibrium), p_c (collusion))
+        (PRICES list, p_e (equilibrium), p_c (collusion), profit_e (equilibrium profit), profit_c (collusion profit))
     """
     # Calculate equilibrium price: p_e = (k1 + c) / (2 - k2)
     p_e = (k1 + c) / (2 - k2)
 
+    # Calculate equilibrium profit: π_e = (p_e - c) * demand1(p_e, p_e, k1, k2)
+    profit_e = (p_e - c) * demand1(p_e, p_e, k1, k2)
+
     # Calculate collusion price: p_c = (2*k1 + 2*c*(1-k2)) / (4*(1-k2))
     p_c = (2 * k1 + 2 * c * (1 - k2)) / (4 * (1 - k2))
+
+    # Calculate collusion profit: π_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
+    profit_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
 
     # Feasible price interval: [2p_e - p_c, 2p_c - p_e]
     price_start = 2 * p_e - p_c
@@ -69,7 +75,7 @@ def calculate_prices(
     # Generate m equally spaced points and round to 1 decimal place to avoid floating point precision issues
     PRICES = np.round(np.linspace(price_start, price_end, m), 3).tolist()
 
-    return PRICES, p_e, p_c
+    return PRICES, p_e, p_c, profit_e, profit_c
 
 
 def state_index(p1: float, p2: float, PRICES: list[float]) -> int:
@@ -123,7 +129,7 @@ def init_session_state_econ(config: dict) -> None:
     seed = config.get("seed", 43)
 
     # Calculate prices and key prices
-    PRICES, p_e, p_c = calculate_prices(k1, k2, c, m)
+    PRICES, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
     N_ACTIONS = len(PRICES)
     N_STATES = N_ACTIONS * N_ACTIONS
 
@@ -141,6 +147,8 @@ def init_session_state_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_cfg_beta"] = beta
     st.session_state[f"{tab_id}_cfg_p_e"] = p_e
     st.session_state[f"{tab_id}_cfg_p_c"] = p_c
+    st.session_state[f"{tab_id}_cfg_profit_e"] = profit_e
+    st.session_state[f"{tab_id}_cfg_profit_c"] = profit_c
     st.session_state[f"{tab_id}_cfg_seed"] = seed
 
     # Initialize random number generator

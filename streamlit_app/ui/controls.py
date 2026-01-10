@@ -382,7 +382,7 @@ def parameters_econ(tab_id: str) -> dict:
         # Calculate and display key prices
         PRICES = None
         try:
-            PRICES, p_e, p_c = calculate_prices(k1, k2, c, m)
+            PRICES, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
             price_start = PRICES[0]
             price_end = PRICES[-1]
 
@@ -393,6 +393,8 @@ def parameters_econ(tab_id: str) -> dict:
                 f"**Collusion price** $p_c = {p_c:.2f}$ | "
                 f"**Price range**: [{price_start:.2f}, {price_end:.2f}] | "
                 f"**Action space** $A$ = {{{', '.join(prices_display)}}}"
+                f"**Equilibrium profit** $\pi_e = {profit_e:.2f}$ | "
+                f"**Collusion profit** $\pi_c = {profit_c:.2f}$"
             )
         except Exception as e:
             st.error(f"Error calculating prices: {e}")

@@ -283,6 +283,10 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
             c = st.session_state.get(f"{tab_id}_cfg_c", 0.0)
             k1 = st.session_state.get(f"{tab_id}_cfg_k1", 1.0)
             k2 = st.session_state.get(f"{tab_id}_cfg_k2", 1.0)
+            p_e = st.session_state.get(f"{tab_id}_cfg_p_e", 0.0)
+            p_c = st.session_state.get(f"{tab_id}_cfg_p_c", 0.0)
+            profit_e = st.session_state.get(f"{tab_id}_cfg_profit_e", 0.0)
+            profit_c = st.session_state.get(f"{tab_id}_cfg_profit_c", 0.0)
 
             # Calculate average profits in the loop
             average_profit_alice = 0.0
@@ -372,11 +376,39 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
                 st.markdown(
                     f"""Cycle detected: starts at step {loop_start}, ends at step {loop_start + len(loop)-1}, length = {len(loop)}<br>
                     <br>
-                    The average price for Alice is {average_p1:.2f}, and for Bob is {average_p2:.2f}.<br>
+                    The average price for Alice is {average_p1:.2f}, and for Bob is {average_p2:.2f};<br>
+                    and the average profit for Alice is {average_profit_alice:.2f}, and for Bob is {average_profit_bob:.2f}.<br>
                     <br>
-                    The average profit for Alice is {average_profit_alice:.2f}, and for Bob is {average_profit_bob:.2f}.""",
+                    Remember that the equilibrium price is {p_e:.2f}, and the collusion price is {p_c:.2f}; 
+                    <br>
+                    and the profit of nash equilibrium is {profit_e:.2f}, and the profit of collusion is {profit_c:.2f}.<br>
+                    """,
                     unsafe_allow_html=True,
                 )
+                # Calculate normalized profits
+                denominator = profit_c - profit_e
+                if abs(denominator) > 1e-10:  # Avoid division by zero
+                    normalized_profit_alice = (
+                        average_profit_alice - profit_e
+                    ) / denominator
+                    normalized_profit_bob = (
+                        average_profit_bob - profit_e
+                    ) / denominator
+                    st.markdown(
+                        rf"""
+                        The normalised profit is calculated as the difference between the average profit and the equilibrium profit, divided by the difference between collusion profit and equilibrium profit: $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
+                        Hence the normalised profit for Alice is $\Delta_{{\text{{Alice}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.4f}$, <br>
+                        and for Bob is $\Delta_{{\text{{Bob}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.4f}$.<br>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        r"""
+                        The normalised profit cannot be calculated because the denominator (collusion profit - equilibrium profit) is zero.
+                        """,
+                        unsafe_allow_html=True,
+                    )
             else:
                 st.info(
                     "No cycle detected within max_steps. Consider increasing max_steps."

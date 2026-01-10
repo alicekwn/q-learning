@@ -30,6 +30,7 @@ from streamlit_app.state_econ import (
     is_in_playback_mode_econ,
     profit1,
     profit2,
+    demand1,
 )
 
 st.set_page_config(page_title="Pricing Strategies in Economics", layout="wide")
@@ -192,7 +193,7 @@ with tab_3:
     col_q1, col_q2 = st.columns(2)
     with col_q1:
         # upload 1st Q-table
-        player_1_name = st.text_input("Enter your name", value="Player 1")
+        player_1_name = st.text_input("Enter your name", value="Alice")
         uploaded_file1 = st.file_uploader(
             "Upload your 1st Q-tables csv file", type="csv", key="q_table_upload_1"
         )
@@ -204,7 +205,7 @@ with tab_3:
 
     with col_q2:
         # upload 2nd Q-table
-        player_2_name = st.text_input("Enter your name", value="Player 2")
+        player_2_name = st.text_input("Enter your name", value="Bob")
         uploaded_file2 = st.file_uploader(
             "Upload your 2nd Q-tables csv file", type="csv", key="q_table_upload_2"
         )
@@ -348,6 +349,18 @@ with tab_3:
             N_ACTIONS = len(PRICES)
             N_STATES = N_ACTIONS * N_ACTIONS
 
+            # Calculate equilibrium and collusion prices and profits
+            # p_e = (k1 + c) / (2 - k2)
+            p_e = (battle_k1 + battle_c) / (2 - battle_k2)
+            # profit_e = (p_e - c) * demand1(p_e, p_e, k1, k2)
+            profit_e = (p_e - battle_c) * demand1(p_e, p_e, battle_k1, battle_k2)
+            # p_c = (2*k1 + 2*c*(1-k2)) / (4*(1-k2))
+            p_c = (2 * battle_k1 + 2 * battle_c * (1 - battle_k2)) / (
+                4 * (1 - battle_k2)
+            )
+            # profit_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
+            profit_c = (p_c - battle_c) * demand1(p_c, p_c, battle_k1, battle_k2)
+
             if df1.shape != (N_STATES, N_ACTIONS) or df2.shape != (N_STATES, N_ACTIONS):
                 st.error(
                     f"❌ Q-table dimensions don't match expected size. "
@@ -382,6 +395,10 @@ with tab_3:
             st.session_state["battle_cfg_k2"] = battle_k2
             st.session_state["battle_cfg_c"] = battle_c
             st.session_state["battle_cfg_start"] = (battle_start_p1, battle_start_p2)
+            st.session_state["battle_cfg_p_e"] = p_e
+            st.session_state["battle_cfg_p_c"] = p_c
+            st.session_state["battle_cfg_profit_e"] = profit_e
+            st.session_state["battle_cfg_profit_c"] = profit_c
 
             st.rerun()
 
@@ -399,12 +416,25 @@ with tab_3:
         battle_c = st.session_state.get("battle_cfg_c", 2.0)
         battle_start = st.session_state.get("battle_cfg_start", (7.0, 7.0))
         battle_start_p1, battle_start_p2 = battle_start
+        p_e = st.session_state.get("battle_cfg_p_e", 0.0)
+        p_c = st.session_state.get("battle_cfg_p_c", 0.0)
+        profit_e = st.session_state.get("battle_cfg_profit_e", 0.0)
+        profit_c = st.session_state.get("battle_cfg_profit_c", 0.0)
 
         path = traj["path"]
         loop = traj["loop"]
         loop_start = traj["loop_start"]
 
         st.markdown("---")
+        st.markdown(
+            rf"""
+            - Equilibrium price: $p_e = {p_e:.2f}$
+            - Collusion price: $p_c = {p_c:.2f}$
+            - Equilibrium profit: $\pi_e = {profit_e:.2f}$
+            - Collusion profit: $\pi_c = {profit_c:.2f}$
+            """
+        )
+
         st.subheader("🏆 Battle Results")
 
         if loop_start is not None and loop:
@@ -467,7 +497,16 @@ with tab_3:
                 )
             else:
                 st.info(f"## {winner}!")
-                st.markdown(f"**Average Profit: {winner_profit:.2f}** (both players)")
+                st.markdown(rf"**Average Profit: {winner_profit:.2f}** (both players)")
+
+            # Calculate normalized profits
+            denominator = profit_c - profit_e
+            if abs(denominator) > 1e-10:  # Avoid division by zero
+                normalized_profit_alice = (avg_profit_alice - profit_e) / denominator
+                normalized_profit_bob = (avg_profit_bob - profit_e) / denominator
+            else:
+                normalized_profit_alice = None
+                normalized_profit_bob = None
 
             # Display detailed results
             col_result1, col_result2 = st.columns(2)
@@ -481,8 +520,20 @@ with tab_3:
                         if avg_profit_alice != avg_profit_bob
                         else None
                     ),
-                    help=f"Average price: {avg_p1:.2f}",
+                    help=rf"Average price: $\bar{{p}}_1 = {avg_p1:.2f}$, average profit: $\bar{{\pi}}_1 = {avg_profit_alice:.2f}$",
                 )
+                if normalized_profit_alice is not None:
+                    st.metric(
+                        "Normalised average profit",
+                        f"{normalized_profit_alice:.2f}",
+                        help=r"Normalised average profit: $\Delta_1 = \dfrac{{\bar{{\pi}}_1 - \pi_e}}{{\pi_c - \pi_e}}$",
+                    )
+                else:
+                    st.metric(
+                        "Normalised average profit",
+                        "N/A",
+                        help="Cannot calculate normalized profit: denominator (collusion profit - equilibrium profit) is zero",
+                    )
 
             with col_result2:
                 st.metric(
@@ -493,8 +544,20 @@ with tab_3:
                         if avg_profit_bob != avg_profit_alice
                         else None
                     ),
-                    help=f"Average price: {avg_p2:.2f}",
+                    help=rf"Average price: $\bar{{p}}_2 = {avg_p2:.2f}$, average profit: $\bar{{\pi}}_2 = {avg_profit_bob:.2f}$",
                 )
+                if normalized_profit_bob is not None:
+                    st.metric(
+                        "Normalised average profit",
+                        f"{normalized_profit_bob:.2f}",
+                        help=r"Normalised average profit: $\Delta_2 = \dfrac{{\bar{{\pi}}_2 - \pi_e}}{{\pi_c - \pi_e}}$",
+                    )
+                else:
+                    st.metric(
+                        "Normalised average profit",
+                        "N/A",
+                        help="Cannot calculate normalized profit: denominator (collusion profit - equilibrium profit) is zero",
+                    )
 
             # Display cycle information
             st.markdown("---")
@@ -563,7 +626,7 @@ with tab_3:
 
                 if len(full_path) > num_visible_cols:
                     st.caption(
-                        f"💡 Scroll horizontally to see all steps. The newest steps appear on the left."
+                        "💡 Scroll horizontally to see all steps. The newest steps appear on the left."
                     )
 
             # Trajectory table for profit steps (same format as tab_2)
@@ -611,17 +674,36 @@ with tab_3:
 
                 if len(full_path) > num_visible_cols:
                     st.caption(
-                        f"💡 Scroll horizontally to see all steps. The newest steps appear on the right."
+                        "💡 Scroll horizontally to see all steps. The newest steps appear on the right."
                     )
-            st.markdown(
-                f"""
-                - **Cycle detected**: starts at step {loop_start}, length = {len(loop)} steps
-                - **Average price for {player_1_name}**: {avg_p1:.2f}
-                - **Average price for {player_2_name}**: {avg_p2:.2f}
-                - **Average profit for {player_1_name}**: {avg_profit_alice:.2f}
-                - **Average profit for {player_2_name}**: {avg_profit_bob:.2f}
-                """
-            )
+            if (
+                normalized_profit_alice is not None
+                and normalized_profit_bob is not None
+            ):
+                st.markdown(
+                    rf"""
+                    - **Cycle detected**: starts at step {loop_start}, length = {len(loop)} steps
+                    - **Average price for {player_1_name} ($\bar{{p}}_1$)**: {avg_p1:.2f}
+                    - **Average price for {player_2_name} ($\bar{{p}}_2$)**: {avg_p2:.2f}
+                    - **Average profit for {player_1_name} ($\bar{{\pi}}_1$)**: {avg_profit_alice:.2f}
+                    - **Average profit for {player_2_name} ($\bar{{\pi}}_2$)**: {avg_profit_bob:.2f}
+                    - Equilibrium profit: $\pi_e = {profit_e:.2f}$
+                    - Collusion profit: $\pi_c = {profit_c:.2f}$
+                    - **Normalised average profit for {player_1_name} ($\Delta_1$)**= $\dfrac{{{avg_profit_alice:.2f}-{profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}}$ = {normalized_profit_alice:.2f}
+                    - **Normalised average profit for {player_2_name} ($\Delta_2$)**= $\dfrac{{{avg_profit_bob:.2f}-{profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}}$ = {normalized_profit_bob:.2f}
+                    """
+                )
+            else:
+                st.markdown(
+                    rf"""
+                    - **Cycle detected**: starts at step {loop_start}, length = {len(loop)} steps
+                    - **Average price for {player_1_name} ($p_1$)**: {avg_p1:.2f}
+                    - **Average price for {player_2_name} ($p_2$)**: {avg_p2:.2f}
+                    - **Average profit for {player_1_name} ($\pi_1$)**: {avg_profit_alice:.2f}
+                    - **Average profit for {player_2_name} ($\pi_2$)**: {avg_profit_bob:.2f}
+                    - **Normalised profit**: Cannot be calculated (denominator is zero)
+                    """
+                )
         else:
             st.warning(
                 "⚠️ No cycle detected within max_steps. Consider adjusting starting prices or increasing max_steps."
