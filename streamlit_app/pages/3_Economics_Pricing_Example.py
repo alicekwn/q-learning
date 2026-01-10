@@ -51,15 +51,19 @@ with tab_1:
 
         $q_1=k_1 - p_1 + k_2 \cdot p_2$, $\quad q_2=k_1 - p_2 + k_2 \cdot p_1$ 
 
-        $\pi_1 = (p_1 - c) \times q_1$, $\quad \pi_2 = (p_2 - c) \times q_2$
+        $\pi_1 = (p_1 - c) \times q_1$, $\quad \pi_2 = (p_2 - c) \times q_2$.
 
         The equilibrium price $p_e$ is calculated as 
 
-        $p_e=\frac{k_1 + c}{2 - k_2}$
+        $p_e=\frac{k_1 + c}{2 - k_2}$.
 
         The collusive price $p_c$ is calculated as 
+        
+        $p_c=\frac{2 k_1 + 2c (1-k_2)}{4(1-k_2)}$.
 
-        $p_c=\frac{2 k_1 + 2c (1-k_2)}{4(1-k_2)}$
+        And the equilibrium profit $\pi_e$ is calculated as $\pi_e = (p_e - c) \times q_1$.
+
+        The collusive profit $\pi_c$ is calculated as $\pi_c = (p_c - c) \times q_1$.
 
         For the feasible prices which each party can take is within the interval $[p_e-\xi(p_c-p_e), p_c+\xi(p_c-p_e)]$.
 
