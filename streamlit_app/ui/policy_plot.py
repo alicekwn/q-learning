@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import math
 
 import matplotlib.pyplot as plt
@@ -245,9 +246,28 @@ def render_policy_1d(
     st.markdown(
         "Read from the Q-matrix, arrows show the optimal action at each position. (A dot means no learning yet.)"
     )
-    fig = _create_policy_figure_1d(q_table, start_pos, end_pos, goal_pos)
-    st.pyplot(fig)
-    plt.close(fig)
+    try:
+        fig = _create_policy_figure_1d(q_table, start_pos, end_pos, goal_pos)
+        # Convert figure to bytes and use st.image() to avoid media file storage issues
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+        buf.seek(0)
+        st.image(buf, width="stretch")
+        buf.close()
+    except Exception as e:
+        # If there's an error with the cached figure, clear cache and retry
+        _create_policy_figure_1d.clear()
+        try:
+            fig = _create_policy_figure_1d(q_table, start_pos, end_pos, goal_pos)
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+            buf.seek(0)
+            st.image(buf, width="stretch")
+            buf.close()
+        except Exception:
+            st.error(f"Error rendering policy plot: {e}")
+    finally:
+        plt.close("all")
 
 
 def render_policy_2d(
@@ -273,6 +293,29 @@ def render_policy_2d(
         """,
         unsafe_allow_html=True,
     )
-    fig = _create_policy_figure_2d(q_table, x_start, x_end, y_start, y_end, goal_pos)
-    st.pyplot(fig)
-    plt.close(fig)
+    try:
+        fig = _create_policy_figure_2d(
+            q_table, x_start, x_end, y_start, y_end, goal_pos
+        )
+        # Convert figure to bytes and use st.image() to avoid media file storage issues
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+        buf.seek(0)
+        st.image(buf, width="stretch")
+        buf.close()
+    except Exception as e:
+        # If there's an error with the cached figure, clear cache and retry
+        _create_policy_figure_2d.clear()
+        try:
+            fig = _create_policy_figure_2d(
+                q_table, x_start, x_end, y_start, y_end, goal_pos
+            )
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+            buf.seek(0)
+            st.image(buf, width="stretch")
+            buf.close()
+        except Exception:
+            st.error(f"Error rendering policy plot: {e}")
+    finally:
+        plt.close("all")

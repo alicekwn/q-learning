@@ -42,7 +42,7 @@ def render_grid_1d(
             display_str = str(pos)
             if show_dog and pos == current_state and pos == goal_pos:
                 # Dog reached the goal - show both
-                display_str += "\n\n🐶🍖"
+                display_str += "\n\n🐶🦴"
             elif show_dog and pos == current_state:
                 display_str += "\n\n🐶"
             elif pos == goal_pos:
@@ -102,7 +102,7 @@ def render_grid_2d(
                 display_str = f"({x},{y})"
                 if show_dog and pos == current_state and pos == goal_pos:
                     # Dog reached the goal - show both
-                    display_str += "\n\n🐶🍖"
+                    display_str += "\n\n🐶🦴"
                 elif show_dog and pos == current_state:
                     display_str += "\n\n🐶"
                 elif pos == goal_pos:

@@ -31,13 +31,14 @@ from streamlit_app.state_econ import (
     profit1,
     profit2,
     demand1,
+    flip_q_table_states,
 )
 
 st.set_page_config(page_title="Pricing Strategies in Economics", layout="wide")
 
 st.title("Pricing Strategies in Economics")
 st.info(
-    "This page demonstrates Q-learning applied to economics pricing with two players (Alice and Bob) learning optimal pricing strategies."
+    "This page demonstrates Q-learning applied to economics pricing with two players learning optimal pricing strategies."
 )
 
 tab_1, tab_2, tab_3 = st.tabs(["Game Theory", "Demo", "Pricing Battle"])
@@ -192,12 +193,22 @@ with tab_3:
     st.markdown(
         """
         Export your Q-tables to a csv file (from the Demo page) and upload it to this pricing battle page, and compete with other players. The winner is the one with the highest average profit of the prices/profits cycle.
+        
+        **Important:** When uploading a Q-table, you must specify whether it was trained from Player 1's perspective (Q1) or Player 2's perspective (Q2). 
+        The state encoding s(p1, p2) depends on which player's perspective the Q-table was trained from. If you upload a Q-table with the wrong perspective, 
+        the system will automatically flip the state indices to match the battle role.
         """
     )
+    # Initialize perspective variables (will be set when files are uploaded)
+    q1_perspective = None
+    q2_perspective = None
+
     col_q1, col_q2 = st.columns(2)
     with col_q1:
         # upload 1st Q-table
-        player_1_name = st.text_input("Enter your name", value="Alice")
+        player_1_name = st.text_input(
+            "Enter your name", value="Alice", key="player_1_name"
+        )
         uploaded_file1 = st.file_uploader(
             "Upload your 1st Q-tables csv file", type="csv", key="q_table_upload_1"
         )
@@ -206,10 +217,18 @@ with tab_3:
             uploaded_file1.seek(0)
             df1_display = pd.read_csv(uploaded_file1)
             st.dataframe(df1_display)
+            q1_perspective = st.selectbox(
+                "This Q-table is from the perspective of:",
+                ["Player 1 (Q1)", "Player 2 (Q2)"],
+                key="q1_perspective",
+                help="Select whether this Q-table was trained from Player 1's perspective (Q1) or Player 2's perspective (Q2). This will be used to correctly interpret the state encoding.",
+            )
 
     with col_q2:
         # upload 2nd Q-table
-        player_2_name = st.text_input("Enter your name", value="Bob")
+        player_2_name = st.text_input(
+            "Enter your name", value="Bob", key="player_2_name"
+        )
         uploaded_file2 = st.file_uploader(
             "Upload your 2nd Q-tables csv file", type="csv", key="q_table_upload_2"
         )
@@ -218,6 +237,12 @@ with tab_3:
             uploaded_file2.seek(0)
             df2_display = pd.read_csv(uploaded_file2)
             st.dataframe(df2_display)
+            q2_perspective = st.selectbox(
+                "This Q-table is from the perspective of:",
+                ["Player 1 (Q1)", "Player 2 (Q2)"],
+                key="q2_perspective",
+                help="Select whether this Q-table was trained from Player 1's perspective (Q1) or Player 2's perspective (Q2). This will be used to correctly interpret the state encoding.",
+            )
 
     st.markdown("---")
 
@@ -336,17 +361,33 @@ with tab_3:
             else:
                 PRICES = PRICES1
 
-            # Validate starting prices are in PRICES
+            # Validate starting prices are in PRICES and normalize to exact values, to avoid floating-point precision issues
             tolerance = 1e-3
             p1_valid = any(abs(battle_start_p1 - p) < tolerance for p in PRICES)
             p2_valid = any(abs(battle_start_p2 - p) < tolerance for p in PRICES)
 
             if not p1_valid or not p2_valid:
-                # Normalize to closest prices
-                battle_start_p1 = min(PRICES, key=lambda p: abs(p - battle_start_p1))
-                battle_start_p2 = min(PRICES, key=lambda p: abs(p - battle_start_p2))
+                st.error(
+                    f"❌ Starting prices must be within tolerance of prices in the action space. "
+                    f"Valid prices: {[f'{p:.1f}' for p in PRICES]}"
+                )
+                st.stop()
+
+            # Store original values for comparison
+            original_p1 = battle_start_p1
+            original_p2 = battle_start_p2
+
+            # Always normalize to exact values from PRICES to avoid floating-point precision issues
+            battle_start_p1 = min(PRICES, key=lambda p: abs(p - original_p1))
+            battle_start_p2 = min(PRICES, key=lambda p: abs(p - original_p2))
+
+            # Only show info if values were actually adjusted
+            if (
+                abs(battle_start_p1 - original_p1) > 1e-10
+                or abs(battle_start_p2 - original_p2) > 1e-10
+            ):
                 st.info(
-                    f"ℹ️ Starting prices adjusted to: p1={battle_start_p1:.1f}, p2={battle_start_p2:.1f}"
+                    f"ℹ️ Starting prices normalized to: p1={battle_start_p1:.1f}, p2={battle_start_p2:.1f}"
                 )
 
             # Validate Q-table dimensions
@@ -373,9 +414,31 @@ with tab_3:
                 )
                 st.stop()
 
+            # Check if perspective selection was made for both Q-tables
+            if q1_perspective is None or q2_perspective is None:
+                st.error(
+                    "❌ Please select the perspective for both uploaded Q-tables before computing the trajectory."
+                )
+                st.stop()
+
             # Convert DataFrames to numpy arrays
-            Q1 = df1.values
-            Q2 = df2.values
+            Q1 = df1.values.copy()
+            Q2 = df2.values.copy()
+
+            # Apply state flipping based on perspective vs battle role
+            # Q1 is used for Player 1: flip if uploaded Q-table is from Player 2's perspective
+            if q1_perspective == "Player 2 (Q2)":
+                Q1 = flip_q_table_states(Q1, PRICES)
+                st.info(
+                    "ℹ️ Q-table 1 was flipped because it was from Player 2's perspective but is being used for Player 1."
+                )
+
+            # Q2 is used for Player 2: flip if uploaded Q-table is from Player 1's perspective
+            if q2_perspective == "Player 1 (Q1)":
+                Q2 = flip_q_table_states(Q2, PRICES)
+                st.info(
+                    "ℹ️ Q-table 2 was flipped because it was from Player 1's perspective but is being used for Player 2."
+                )
 
             # Initialize random number generator
             rng = np.random.default_rng(43)
