@@ -115,7 +115,7 @@ def flip_q_table_states(Q: np.ndarray, PRICES: list[float]) -> np.ndarray:
     for s in range(N_STATES):
         p1, p2 = index_to_state(s, PRICES)
         # Intentionally swap p1 and p2 to flip state perspective
-        s_flipped = state_index(p2, p1, PRICES)  # type: ignore[arg-type]
+        s_flipped = state_index(p1=p2, p2=p1, PRICES=PRICES)
         Q_flipped[s_flipped] = Q[s]  # Copy Q-values to flipped state
 
     return Q_flipped
