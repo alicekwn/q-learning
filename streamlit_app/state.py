@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import streamlit as st
+import random
 
 from qlearning import LineGrid, RectangularGrid, QLearningAgent
 
@@ -86,8 +87,8 @@ def init_session_state(config: dict) -> None:
         []
     )  # Steps taken in each completed episode
     st.session_state[f"{tab_id}_episode_completed_via_step"] = (
-        False
-    )  # Track if episode completed via step-by-step/autoplay vs batch
+        False  # Track if episode completed via step-by-step/autoplay vs batch
+    )
 
     record_q_history(config)
 
@@ -126,7 +127,9 @@ def reset_episode(config: dict) -> None:
     st.session_state[f"{tab_id}_is_terminal"] = start_s == config["goal_pos"]
     st.session_state[f"{tab_id}_episode_start"] = start_s  # Track episode start
     st.session_state[f"{tab_id}_ready_for_episode"] = False  # Now training this episode
-    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Reset flag for new episode
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+        False  # Reset flag for new episode
+    )
     # Don't clear step_log - keep history across episodes
 
     # Save initial checkpoint for this episode (allows rewind to start)
@@ -294,7 +297,9 @@ def step_agent(config: dict) -> None:
 
         st.session_state[f"{tab_id}_total_episodes"] += 1
         st.session_state[f"{tab_id}_ready_for_episode"] = True  # Ready for next episode
-        st.session_state[f"{tab_id}_episode_completed_via_step"] = True  # Completed via step-by-step/autoplay
+        st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+            True  # Completed via step-by-step/autoplay
+        )
         record_q_history(config)
 
     # Save checkpoint for this user action
@@ -389,7 +394,9 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
     # After batch, set to ready state (terminal, ready for next action)
     st.session_state[f"{tab_id}_is_terminal"] = True
     st.session_state[f"{tab_id}_ready_for_episode"] = True  # Ready for next action
-    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Completed via batch training
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+        False  # Completed via batch training
+    )
 
     # Save single checkpoint for entire batch
     save_checkpoint(config, "batch", {"episodes": episodes_to_run})
@@ -453,7 +460,9 @@ def get_display_state(config: dict) -> dict:
         "ready_for_episode": checkpoint.get("ready_for_episode", True),
         "is_terminal": checkpoint.get("is_terminal", True),
         "steps_per_episode": checkpoint.get("steps_per_episode", []),
-        "episode_completed_via_step": checkpoint.get("episode_completed_via_step", False),
+        "episode_completed_via_step": checkpoint.get(
+            "episode_completed_via_step", False
+        ),
         "action_type": checkpoint["type"],
         "metadata": checkpoint["metadata"],
         "is_live": False,
@@ -582,7 +591,9 @@ def init_session_state_2d(config: dict) -> None:
     st.session_state[f"{tab_id}_total_episodes"] = 0
     st.session_state[f"{tab_id}_playback_index"] = -1
     st.session_state[f"{tab_id}_steps_per_episode"] = []
-    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Track if episode completed via step-by-step/autoplay vs batch
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+        False  # Track if episode completed via step-by-step/autoplay vs batch
+    )
 
     record_q_history_2d(config)
     save_checkpoint(config, "init", {"description": "Initial state"})
@@ -631,7 +642,9 @@ def reset_episode_2d(config: dict) -> None:
     st.session_state[f"{tab_id}_is_terminal"] = start_s == goal_pos
     st.session_state[f"{tab_id}_episode_start"] = start_s
     st.session_state[f"{tab_id}_ready_for_episode"] = False
-    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Reset flag for new episode
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+        False  # Reset flag for new episode
+    )
 
     save_checkpoint(
         config,
@@ -669,12 +682,11 @@ def step_agent_2d(config: dict) -> None:
     gamma = config["gamma"]
 
     # 1. Choose Action (Epsilon-Greedy) - use agent method
-    action = agent._greedy_action_constant(state)
+    action = agent.choose_action(state)
     if action is None:
         return  # Terminal state
 
     # Determine decision type for logging
-    import random
 
     if random.random() < agent.epsilon:
         decision_type = "Exploratory (Random)"
@@ -688,7 +700,7 @@ def step_agent_2d(config: dict) -> None:
     old_val = q_dict[(state, action)]
 
     # 4. Bellman update - use agent method
-    agent._q_update(state, action, reward, next_state)
+    agent.update_q(state, action, reward, next_state)
 
     # 5. Sync Q-values to session state dict and DataFrame
     new_val = agent.Q[(state, action)]
@@ -759,7 +771,9 @@ def step_agent_2d(config: dict) -> None:
 
         st.session_state[f"{tab_id}_total_episodes"] += 1
         st.session_state[f"{tab_id}_ready_for_episode"] = True
-        st.session_state[f"{tab_id}_episode_completed_via_step"] = True  # Completed via step-by-step/autoplay
+        st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+            True  # Completed via step-by-step/autoplay
+        )
         record_q_history_2d(config)
 
     save_checkpoint(
@@ -808,7 +822,7 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
 
         while not env.is_terminal(curr_s) and steps < 100:
             # Use agent's epsilon-greedy action selection
-            action = agent._greedy_action_constant(curr_s)
+            action = agent.choose_action(curr_s)
             if action is None:
                 break
 
@@ -816,7 +830,7 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
             next_s, reward, _ = env.step(curr_s, action)
 
             # Use agent's Q-update method
-            agent._q_update(curr_s, action, reward, next_s)
+            agent.update_q(curr_s, action, reward, next_s)
 
             # Sync Q-values to session state
             q_dict[(curr_s, action)] = agent.Q[(curr_s, action)]
@@ -844,6 +858,8 @@ def run_batch_training_2d(episodes_to_run: int, config: dict) -> None:
 
     st.session_state[f"{tab_id}_is_terminal"] = True
     st.session_state[f"{tab_id}_ready_for_episode"] = True
-    st.session_state[f"{tab_id}_episode_completed_via_step"] = False  # Completed via batch training
+    st.session_state[f"{tab_id}_episode_completed_via_step"] = (
+        False  # Completed via batch training
+    )
 
     save_checkpoint(config, "batch", {"episodes": episodes_to_run})
