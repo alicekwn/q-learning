@@ -66,7 +66,9 @@ pip install -e ".[dev]"
 
 ### Running the Streamlit App
 
-After installation, run the interactive Q-learning demo:
+The app is deployed at https://qlearning-demo.streamlit.app/. 
+
+To edit the app, run the interactive Q-learning demo locally:
 
 ```bash
 streamlit run streamlit_app/Welcome.py
