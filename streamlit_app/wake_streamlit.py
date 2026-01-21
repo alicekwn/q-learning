@@ -1,22 +1,26 @@
 """
-This script wakes up the Streamlit app by using Github Actions to automatically click the wake-up button in streamlit, to prevent the app from sleeping.
+This script wakes up the Streamlit app by using Github Actions to automatically click the
+wake-up button in streamlit, to prevent the app from sleeping.
 Streamlit app will normally sleep automatically after 12 hours of inactivity.
 """
 
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.common.exceptions import TimeoutException
 
-# Streamlit app URL from environment variable (or default)
+# Streamlit app URL from environment variable
 STREAMLIT_URL = "https://qlearning-demo.streamlit.app/"
 
 
 def main():
+    """
+    Set up the Chrome driver and open the Streamlit app.
+    """
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -62,7 +66,7 @@ def main():
             # No button at all → app is assumed to be awake
             print("No wake-up button found. Assuming app is already awake ✅")
 
-    except Exception as e:
+    except WebDriverException as e:
         print(f"Unexpected error: {e}")
         exit(1)
     finally:
