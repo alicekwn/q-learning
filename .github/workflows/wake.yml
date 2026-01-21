@@ -19,6 +19,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r wake_streamlit_app/requirements.txt
+          pip install selenium webdriver-manager
       - name: Run Selenium script
-        run: python wake_streamlit_app/wake_streamlit.py
+        run: python streamlit_app/wake_streamlit.py
