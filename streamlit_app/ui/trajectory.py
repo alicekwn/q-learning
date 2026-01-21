@@ -111,7 +111,7 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
     if not prices:
         st.info("Initialize the model first to compute trajectories.")
         return
-    prices_display = [f"{p:.2f}" for p in prices]
+    prices_display = [f"{p:.1f}" for p in prices]
 
     st.subheader("Greedy Trajectory")
     st.markdown(
@@ -141,7 +141,7 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
             min_value=float(min(prices)),
             max_value=float(max(prices)),
             value=float(prices[len(prices) // 2]),
-            step=0.01,
+            step=0.1,
             key=f"{tab_id}_traj_p1",
             help="Starting price for player 1 (Alice)",
         )
@@ -151,19 +151,19 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
             min_value=float(min(prices)),
             max_value=float(max(prices)),
             value=float(prices[len(prices) // 2]),
-            step=0.01,
+            step=0.1,
             key=f"{tab_id}_traj_p2",
             help="Starting price for player 2 (Bob)",
         )
 
     # Validate and normalize prices to exact values in PRICES list (handles floating-point precision)
-    tolerance = 5e-3
+    tolerance = 5e-2
     p1_valid = any(abs(start_p1 - p) <= tolerance for p in prices)
     p2_valid = any(abs(start_p2 - p) <= tolerance for p in prices)
 
     if not p1_valid or not p2_valid:
         st.warning(
-            f"⚠️ Prices must be in the action space: {{{', '.join([f'{p:.2f}' for p in prices])}}}. "
+            f"⚠️ Prices must be in the action space: {{{', '.join([f'{p:.1f}' for p in prices])}}}. "
             f"Please select valid prices."
         )
         return
@@ -380,10 +380,10 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                 st.markdown(
                     f"""Cycle detected: starts at step {loop_start}, ends at step {loop_start + len(loop)-1}, length = {len(loop)}<br>
                     <br>
-                    The average price for Alice is {average_p1:.2f}, and for Bob is {average_p2:.2f};<br>
+                    The average price for Alice is {average_p1:.1f}, and for Bob is {average_p2:.1f};<br>
                     and the average profit for Alice is {average_profit_alice:.2f}, and for Bob is {average_profit_bob:.2f}.<br>
                     <br>
-                    Remember that the equilibrium price is {p_e:.2f}, and the collusion price is {p_c:.2f}; 
+                    Remember that the equilibrium price is {p_e:.1f}, and the collusion price is {p_c:.1f}; 
                     <br>
                     and the profit of nash equilibrium is {profit_e:.2f}, and the profit of collusion is {profit_c:.2f}.<br>
                     """,
@@ -405,8 +405,8 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                         $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
                         <br>
                         Hence the normalised profit <br>
-                        for Alice is: $\Delta_{{\text{{Alice}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.4f}$, <br>
-                        and for Bob is: $\Delta_{{\text{{Bob}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.4f}$.<br>
+                        for Alice is: $\Delta_{{\text{{Alice}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.2f}$, <br>
+                        and for Bob is: $\Delta_{{\text{{Bob}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.2f}$.<br>
                         """,
                         unsafe_allow_html=True,
                     )

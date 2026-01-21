@@ -343,7 +343,7 @@ def parameters_econ(tab_id: str) -> dict:
 
     # Row 1: Environment Settings
     with st.expander("💰 Environment Settings", expanded=True):
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 2])
 
         with col1:
             k1: float = st.number_input(
@@ -393,13 +393,14 @@ def parameters_econ(tab_id: str) -> dict:
             price_end = prices[-1]
 
             # Format action space for display (round each price to 1 decimal place)
-            prices_display = [f"{p:.2f}" for p in prices]
+            prices_display = [f"{p:.1f}" for p in prices]
             st.info(
-                f"**Equilibrium price** $p_e = {p_e:.2f}$ | "
-                f"**Collusion price** $p_c = {p_c:.2f}$ | "
-                f"**Price range**: [{price_start:.2f}, {price_end:.2f}] | "
-                f"**Action space** $A$ = {{{', '.join(prices_display)}}}"
+                f"**Equilibrium price** $p_e = {p_e:.1f}$ | "
+                f"**Collusion price** $p_c = {p_c:.1f}$ | "
+                f"**Price range**: [{price_start:.1f}, {price_end:.1f}] | "
+                f"**Action space** $A$ = {{{', '.join(prices_display)}}}, rounded to 1 decimal place",
             )
+
         except Exception as e:
             st.error(f"Error calculating prices: {e}")
             # Use defaults
@@ -407,60 +408,56 @@ def parameters_econ(tab_id: str) -> dict:
             p_e = 6.0
             p_c = 8.0
 
-        # Starting prices section
-        st.markdown("---")
-        start_mode: str = st.radio(
-            "Starting prices for initialization:",
-            ["Randomised", "Fixed"],
-            index=0,
-            key=f"{tab_id}_start_mode",
-            horizontal=True,
-            help="Choose whether starting prices are randomized or fixed for each initialization.",
-        )
-
-        # Default fixed prices (middle of range)
-        default_p1 = prices[len(prices) // 2] if prices else 7.0
-        default_p2 = prices[len(prices) // 2] if prices else 7.0
-        fixed_start_p1: float = default_p1
-        fixed_start_p2: float = default_p2
-
-        if start_mode == "Fixed":
-            col_p1, col_p2 = st.columns(2)
-            with col_p1:
-                fixed_start_p1 = st.number_input(
-                    "Fixed starting price for Alice (p1):",
-                    min_value=float(prices[0]) if prices else 4.0,
-                    max_value=float(prices[-1]) if prices else 10.0,
-                    value=float(default_p1),
-                    step=0.1,
-                    key=f"{tab_id}_fixed_start_p1",
-                    help="When fixed, Alice will always start at this price.",
-                )
-            with col_p2:
-                fixed_start_p2 = st.number_input(
-                    "Fixed starting price for Bob (p2):",
-                    min_value=float(prices[0]) if prices else 4.0,
-                    max_value=float(prices[-1]) if prices else 10.0,
-                    value=float(default_p2),
-                    step=0.1,
-                    key=f"{tab_id}_fixed_start_p2",
-                    help="When fixed, Bob will always start at this price.",
-                )
-
-            # Validate that fixed prices are in PRICES
-            if prices:
-                if fixed_start_p1 not in prices:
-                    st.warning(
-                        f"⚠️ p1 must be in the action space: {[f'{p:.1f}' for p in prices]}"
-                    )
-                if fixed_start_p2 not in prices:
-                    st.warning(
-                        f"⚠️ p2 must be in the action space: {[f'{p:.1f}' for p in prices]}"
-                    )
-        else:
-            st.info(
-                "Starting prices will be chosen randomly from the action space for each initialization."
+        with col5:
+            # Starting prices section
+            start_mode: str = st.radio(
+                "Starting prices for initialization:",
+                ["Randomised", "Fixed"],
+                index=0,
+                key=f"{tab_id}_start_mode",
+                horizontal=True,
+                help="Choose whether starting prices are randomized or fixed for each initialization.",
             )
+
+            # Default fixed prices (middle of range)
+            default_p1 = prices[len(prices) // 2] if prices else 7.0
+            default_p2 = prices[len(prices) // 2] if prices else 7.0
+            fixed_start_p1: float = default_p1
+            fixed_start_p2: float = default_p2
+
+            if start_mode == "Fixed":
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    fixed_start_p1 = st.number_input(
+                        r"Starting price for Alice ($p_1$):",
+                        min_value=float(prices[0]) if prices else 4.0,
+                        max_value=float(prices[-1]) if prices else 10.0,
+                        value=float(default_p1),
+                        step=0.1,
+                        key=f"{tab_id}_fixed_start_p1",
+                        help="When fixed, Alice will always start at this price.",
+                    )
+                with col_p2:
+                    fixed_start_p2 = st.number_input(
+                        r"Starting price for Bob ($p_2$):",
+                        min_value=float(prices[0]) if prices else 4.0,
+                        max_value=float(prices[-1]) if prices else 10.0,
+                        value=float(default_p2),
+                        step=0.1,
+                        key=f"{tab_id}_fixed_start_p2",
+                        help="When fixed, Bob will always start at this price.",
+                    )
+
+                # Validate that fixed prices are in PRICES
+                if prices:
+                    if fixed_start_p1 not in prices:
+                        st.warning(
+                            f"⚠️ p1 must be in the action space: {[f'{p:.1f}' for p in prices]}"
+                        )
+                    if fixed_start_p2 not in prices:
+                        st.warning(
+                            f"⚠️ p2 must be in the action space: {[f'{p:.1f}' for p in prices]}"
+                        )
 
     # Row 2: Q-Learning Parameters
     with st.expander("🧠 Q-Learning Parameters", expanded=True):
@@ -507,6 +504,7 @@ def parameters_econ(tab_id: str) -> dict:
                 max_value=1000,
                 value=43,
                 key=f"{tab_id}_seed",
+                help="Random seed for reproducibility. Change the seed to get different training results.",
             )
         with col_check:
             check_every: int = st.number_input(
