@@ -5,7 +5,13 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
-from streamlit_app.state_econ import profit1, profit2
+from streamlit_app.state_econ import (
+    profit1,
+    profit2,
+    state_index,
+    index_to_state,
+    argmax_tie,
+)
 
 __all__ = ["render_trajectory_econ"]
 
@@ -14,19 +20,18 @@ def greedy_successor_econ(
     Q1: np.ndarray,
     Q2: np.ndarray,
     s: int,
-    PRICES: list[float],
+    prices: list[float],
     rng: np.random.Generator,
 ) -> tuple[int, int, float, float, int]:
     """From state index s, take each firm's greedy action and return:
     (a1, a2, p1_next, p2_next, s_next)
     """
-    from streamlit_app.state_econ import argmax_tie, state_index
 
     a1 = argmax_tie(Q1[s], rng)
     a2 = argmax_tie(Q2[s], rng)
-    p1_next = PRICES[a1]
-    p2_next = PRICES[a2]
-    s_next = state_index(p1_next, p2_next, PRICES)
+    p1_next = prices[a1]
+    p2_next = prices[a2]
+    s_next = state_index(p1_next, p2_next, prices)
     return a1, a2, p1_next, p2_next, s_next
 
 
@@ -35,7 +40,7 @@ def follow_greedy_until_loop_econ(
     Q2: np.ndarray,
     start_p1: float,
     start_p2: float,
-    PRICES: list[float],
+    prices: list[float],
     rng: np.random.Generator,
     max_steps: int = 100000,
 ) -> dict:
@@ -43,10 +48,9 @@ def follow_greedy_until_loop_econ(
 
     Returns a dict with the full path and the detected cycle.
     """
-    from streamlit_app.state_econ import state_index, index_to_state
 
     # Start state
-    s = state_index(start_p1, start_p2, PRICES)
+    s = state_index(start_p1, start_p2, prices)
 
     # Remember when we first saw each state (for loop detection)
     first_seen_at = {}  # state_idx -> time step when first visited
@@ -66,10 +70,10 @@ def follow_greedy_until_loop_econ(
         first_seen_at[s] = t
 
         # Decode current state's (p1, p2) for display
-        cur_p1, cur_p2 = index_to_state(s, PRICES)
+        cur_p1, cur_p2 = index_to_state(s, prices)
 
         # Take greedy actions and move to successor
-        a1, a2, p1_next, p2_next, s_next = greedy_successor_econ(Q1, Q2, s, PRICES, rng)
+        a1, a2, p1_next, p2_next, s_next = greedy_successor_econ(Q1, Q2, s, prices, rng)
 
         # Record transition
         path.append(
@@ -93,7 +97,7 @@ def follow_greedy_until_loop_econ(
     return {"path": path, "loop_start": None, "loop": []}
 
 
-def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: ARG001
+def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
     """Render trajectory computation UI for economics pricing.
 
     Args:
@@ -103,11 +107,11 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
     tab_id = config.get("tab_id", "default")
 
     # Get available prices from session state
-    PRICES = st.session_state.get(f"{tab_id}_PRICES", [])
-    if not PRICES:
+    prices = st.session_state.get(f"{tab_id}_prices", [])
+    if not prices:
         st.info("Initialize the model first to compute trajectories.")
         return
-    prices_display = [f"{p:.1f}" for p in PRICES]
+    prices_display = [f"{p:.2f}" for p in prices]
 
     st.subheader("Greedy Trajectory")
     st.markdown(
@@ -134,39 +138,39 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
     with col1:
         start_p1 = st.number_input(
             r"Starting price for Alice ($p_1$):",
-            min_value=float(min(PRICES)),
-            max_value=float(max(PRICES)),
-            value=float(PRICES[len(PRICES) // 2]),
-            step=0.1,
+            min_value=float(min(prices)),
+            max_value=float(max(prices)),
+            value=float(prices[len(prices) // 2]),
+            step=0.01,
             key=f"{tab_id}_traj_p1",
             help="Starting price for player 1 (Alice)",
         )
     with col2:
         start_p2 = st.number_input(
             r"Starting price for Bob ($p_2$):",
-            min_value=float(min(PRICES)),
-            max_value=float(max(PRICES)),
-            value=float(PRICES[len(PRICES) // 2]),
-            step=0.1,
+            min_value=float(min(prices)),
+            max_value=float(max(prices)),
+            value=float(prices[len(prices) // 2]),
+            step=0.01,
             key=f"{tab_id}_traj_p2",
             help="Starting price for player 2 (Bob)",
         )
 
     # Validate and normalize prices to exact values in PRICES list (handles floating-point precision)
-    tolerance = 1e-5
-    p1_valid = any(np.isclose(start_p1, p, atol=tolerance) for p in PRICES)
-    p2_valid = any(np.isclose(start_p2, p, atol=tolerance) for p in PRICES)
+    tolerance = 5e-3
+    p1_valid = any(abs(start_p1 - p) <= tolerance for p in prices)
+    p2_valid = any(abs(start_p2 - p) <= tolerance for p in prices)
 
     if not p1_valid or not p2_valid:
         st.warning(
-            f"⚠️ Prices must be in the action space: {{{', '.join([f'{p:.1f}' for p in PRICES])}}}. "
+            f"⚠️ Prices must be in the action space: {{{', '.join([f'{p:.2f}' for p in prices])}}}. "
             f"Please select valid prices."
         )
         return
 
     # Normalize to exact values in PRICES to avoid floating-point precision issues
-    start_p1 = min(PRICES, key=lambda p: abs(p - start_p1))
-    start_p2 = min(PRICES, key=lambda p: abs(p - start_p2))
+    start_p1 = min(prices, key=lambda p: abs(p - start_p1))
+    start_p2 = min(prices, key=lambda p: abs(p - start_p2))
 
     # Button to compute trajectory
     if st.button("Compute Greedy Trajectory", key=f"{tab_id}_compute_traj"):
@@ -185,7 +189,7 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
         # Compute trajectory
         with st.spinner("Computing trajectory..."):
             traj = follow_greedy_until_loop_econ(
-                Q1, Q2, start_p1, start_p2, PRICES, rng, max_steps=50000
+                Q1, Q2, start_p1, start_p2, prices, rng, max_steps=50000
             )
 
         # Store in session state for display
@@ -273,7 +277,7 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
 
                 if len(full_path) > num_visible_cols:
                     st.caption(
-                        f"💡 Scroll horizontally to see all steps. The newest steps appear on the left."
+                        "Scroll horizontally to see all steps. The newest steps appear on the left."
                     )
 
             # Trajectory table for profit steps
@@ -368,7 +372,7 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
 
                 if len(full_path) > num_visible_cols:
                     st.caption(
-                        f"💡 Scroll horizontally to see all steps. The newest steps appear on the right."
+                        "💡 Scroll horizontally to see all steps. The newest steps appear on the right."
                     )
 
             # Display cycle if detected
@@ -396,16 +400,21 @@ def render_trajectory_econ(config: dict, display_state: dict) -> None:  # noqa: 
                     ) / denominator
                     st.markdown(
                         rf"""
-                        The normalised profit is calculated as the difference between the average profit and the equilibrium profit, divided by the difference between collusion profit and equilibrium profit: $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
-                        Hence the normalised profit for Alice is $\Delta_{{\text{{Alice}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.4f}$, <br>
-                        and for Bob is $\Delta_{{\text{{Bob}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.4f}$.<br>
+                        The normalised profit is calculated as the difference between the average profit and the equilibrium profit, 
+                        divided by the difference between collusion profit and equilibrium profit: <br>
+                        $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
+                        <br>
+                        Hence the normalised profit <br>
+                        for Alice is: $\Delta_{{\text{{Alice}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.4f}$, <br>
+                        and for Bob is: $\Delta_{{\text{{Bob}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.4f}$.<br>
                         """,
                         unsafe_allow_html=True,
                     )
                 else:
                     st.markdown(
                         r"""
-                        The normalised profit cannot be calculated because the denominator (collusion profit - equilibrium profit) is zero.
+                        The normalised profit cannot be calculated because the denominator 
+                        (collusion profit - equilibrium profit) is zero.
                         """,
                         unsafe_allow_html=True,
                     )

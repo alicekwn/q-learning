@@ -185,7 +185,7 @@ with tab_2:
     st.markdown("---")
 
     # Trajectory section
-    render_trajectory_econ(config_demo, display_state)
+    render_trajectory_econ(config_demo)
 
 
 with tab_3:
@@ -329,7 +329,7 @@ with tab_3:
             df1 = pd.read_csv(uploaded_file1, index_col=0)
             df2 = pd.read_csv(uploaded_file2, index_col=0)
 
-            # Extract PRICES from column names (format: "price=X.X")
+            # Extract prices from column names (format: "price=X.X")
             def extract_prices_from_columns(df):
                 prices = []
                 for col in df.columns:
@@ -341,35 +341,35 @@ with tab_3:
                             pass
                 return sorted(prices)
 
-            PRICES1 = extract_prices_from_columns(df1)
-            PRICES2 = extract_prices_from_columns(df2)
+            prices1 = extract_prices_from_columns(df1)
+            prices2 = extract_prices_from_columns(df2)
 
-            # Validate that both Q-tables use the same PRICES
-            if len(PRICES1) == 0 or len(PRICES2) == 0:
+            # Validate that both Q-tables use the same prices
+            if len(prices1) == 0 or len(prices2) == 0:
                 st.error(
                     "❌ Could not extract prices from Q-table columns. Expected format: 'price=X.X'"
                 )
                 st.stop()
 
-            if PRICES1 != PRICES2:
+            if prices1 != prices2:
                 st.warning(
                     "⚠️ The two Q-tables use different price sets. Using prices from the first Q-table."
                 )
-                st.info(f"Q-table 1 prices: {[f'{p:.1f}' for p in PRICES1]}")
-                st.info(f"Q-table 2 prices: {[f'{p:.1f}' for p in PRICES2]}")
-                PRICES = PRICES1
+                st.info(f"Q-table 1 prices: {[f'{p:.1f}' for p in prices1]}")
+                st.info(f"Q-table 2 prices: {[f'{p:.1f}' for p in prices2]}")
+                prices = prices1
             else:
-                PRICES = PRICES1
+                prices = prices1
 
-            # Validate starting prices are in PRICES and normalize to exact values, to avoid floating-point precision issues
+            # Validate starting prices are in prices and normalize to exact values, to avoid floating-point precision issues
             tolerance = 1e-3
-            p1_valid = any(abs(battle_start_p1 - p) < tolerance for p in PRICES)
-            p2_valid = any(abs(battle_start_p2 - p) < tolerance for p in PRICES)
+            p1_valid = any(abs(battle_start_p1 - p) < tolerance for p in prices)
+            p2_valid = any(abs(battle_start_p2 - p) < tolerance for p in prices)
 
             if not p1_valid or not p2_valid:
                 st.error(
                     f"❌ Starting prices must be within tolerance of prices in the action space. "
-                    f"Valid prices: {[f'{p:.1f}' for p in PRICES]}"
+                    f"Valid prices: {[f'{p:.1f}' for p in prices]}"
                 )
                 st.stop()
 
@@ -377,9 +377,9 @@ with tab_3:
             original_p1 = battle_start_p1
             original_p2 = battle_start_p2
 
-            # Always normalize to exact values from PRICES to avoid floating-point precision issues
-            battle_start_p1 = min(PRICES, key=lambda p: abs(p - original_p1))
-            battle_start_p2 = min(PRICES, key=lambda p: abs(p - original_p2))
+            # Always normalize to exact values from 'prices' to avoid floating-point precision issues
+            battle_start_p1 = min(prices, key=lambda p: abs(p - original_p1))
+            battle_start_p2 = min(prices, key=lambda p: abs(p - original_p2))
 
             # Only show info if values were actually adjusted
             if (
@@ -391,8 +391,8 @@ with tab_3:
                 )
 
             # Validate Q-table dimensions
-            N_ACTIONS = len(PRICES)
-            N_STATES = N_ACTIONS * N_ACTIONS
+            n_actions = len(prices)
+            n_states = n_actions * n_actions
 
             # Calculate equilibrium and collusion prices and profits
             # p_e = (k1 + c) / (2 - k2)
@@ -406,10 +406,10 @@ with tab_3:
             # profit_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
             profit_c = (p_c - battle_c) * demand1(p_c, p_c, battle_k1, battle_k2)
 
-            if df1.shape != (N_STATES, N_ACTIONS) or df2.shape != (N_STATES, N_ACTIONS):
+            if df1.shape != (n_states, n_actions) or df2.shape != (n_states, n_actions):
                 st.error(
                     f"❌ Q-table dimensions don't match expected size. "
-                    f"Expected: ({N_STATES}, {N_ACTIONS}), "
+                    f"Expected: ({n_states}, {n_actions}), "
                     f"Got: Q-table 1: {df1.shape}, Q-table 2: {df2.shape}"
                 )
                 st.stop()
@@ -428,14 +428,14 @@ with tab_3:
             # Apply state flipping based on perspective vs battle role
             # Q1 is used for Player 1: flip if uploaded Q-table is from Player 2's perspective
             if q1_perspective == "Player 2 (Q2)":
-                Q1 = flip_q_table_states(Q1, PRICES)
+                Q1 = flip_q_table_states(Q1, prices)
                 st.info(
                     "ℹ️ Q-table 1 was flipped because it was from Player 2's perspective but is being used for Player 1."
                 )
 
             # Q2 is used for Player 2: flip if uploaded Q-table is from Player 1's perspective
             if q2_perspective == "Player 1 (Q1)":
-                Q2 = flip_q_table_states(Q2, PRICES)
+                Q2 = flip_q_table_states(Q2, prices)
                 st.info(
                     "ℹ️ Q-table 2 was flipped because it was from Player 1's perspective but is being used for Player 2."
                 )
@@ -450,14 +450,14 @@ with tab_3:
                     Q2,
                     battle_start_p1,
                     battle_start_p2,
-                    PRICES,
+                    prices,
                     rng,
                     max_steps=50000,
                 )
 
             # Store in session state for potential display (use different keys to avoid widget conflicts)
             st.session_state["battle_trajectory"] = traj
-            st.session_state["battle_PRICES"] = PRICES
+            st.session_state["battle_prices"] = prices
             st.session_state["battle_cfg_k1"] = battle_k1
             st.session_state["battle_cfg_k2"] = battle_k2
             st.session_state["battle_cfg_c"] = battle_c
@@ -476,7 +476,7 @@ with tab_3:
     # Display results if trajectory has been computed
     if "battle_trajectory" in st.session_state:
         traj = st.session_state["battle_trajectory"]
-        PRICES = st.session_state["battle_PRICES"]
+        prices = st.session_state["battle_prices"]
         # Read stored config values (stored when trajectory was computed)
         battle_k1 = st.session_state.get("battle_cfg_k1", 7.0)
         battle_k2 = st.session_state.get("battle_cfg_k2", 0.5)

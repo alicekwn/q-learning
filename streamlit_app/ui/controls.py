@@ -386,14 +386,14 @@ def parameters_econ(tab_id: str) -> dict:
             )
 
         # Calculate and display key prices
-        PRICES = None
+        prices = None
         try:
-            PRICES, p_e, p_c, _, _ = calculate_prices(k1, k2, c, m)
-            price_start = PRICES[0]
-            price_end = PRICES[-1]
+            prices, p_e, p_c, _, _ = calculate_prices(k1, k2, c, m)
+            price_start = prices[0]
+            price_end = prices[-1]
 
             # Format action space for display (round each price to 1 decimal place)
-            prices_display = [f"{p:.1f}" for p in PRICES]
+            prices_display = [f"{p:.2f}" for p in prices]
             st.info(
                 f"**Equilibrium price** $p_e = {p_e:.2f}$ | "
                 f"**Collusion price** $p_c = {p_c:.2f}$ | "
@@ -403,7 +403,7 @@ def parameters_econ(tab_id: str) -> dict:
         except Exception as e:
             st.error(f"Error calculating prices: {e}")
             # Use defaults
-            PRICES = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+            prices = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
             p_e = 6.0
             p_c = 8.0
 
@@ -419,8 +419,8 @@ def parameters_econ(tab_id: str) -> dict:
         )
 
         # Default fixed prices (middle of range)
-        default_p1 = PRICES[len(PRICES) // 2] if PRICES else 7.0
-        default_p2 = PRICES[len(PRICES) // 2] if PRICES else 7.0
+        default_p1 = prices[len(prices) // 2] if prices else 7.0
+        default_p2 = prices[len(prices) // 2] if prices else 7.0
         fixed_start_p1: float = default_p1
         fixed_start_p2: float = default_p2
 
@@ -429,8 +429,8 @@ def parameters_econ(tab_id: str) -> dict:
             with col_p1:
                 fixed_start_p1 = st.number_input(
                     "Fixed starting price for Alice (p1):",
-                    min_value=float(PRICES[0]) if PRICES else 4.0,
-                    max_value=float(PRICES[-1]) if PRICES else 10.0,
+                    min_value=float(prices[0]) if prices else 4.0,
+                    max_value=float(prices[-1]) if prices else 10.0,
                     value=float(default_p1),
                     step=0.1,
                     key=f"{tab_id}_fixed_start_p1",
@@ -439,8 +439,8 @@ def parameters_econ(tab_id: str) -> dict:
             with col_p2:
                 fixed_start_p2 = st.number_input(
                     "Fixed starting price for Bob (p2):",
-                    min_value=float(PRICES[0]) if PRICES else 4.0,
-                    max_value=float(PRICES[-1]) if PRICES else 10.0,
+                    min_value=float(prices[0]) if prices else 4.0,
+                    max_value=float(prices[-1]) if prices else 10.0,
                     value=float(default_p2),
                     step=0.1,
                     key=f"{tab_id}_fixed_start_p2",
@@ -448,14 +448,14 @@ def parameters_econ(tab_id: str) -> dict:
                 )
 
             # Validate that fixed prices are in PRICES
-            if PRICES:
-                if fixed_start_p1 not in PRICES:
+            if prices:
+                if fixed_start_p1 not in prices:
                     st.warning(
-                        f"⚠️ p1 must be in the action space: {[f'{p:.1f}' for p in PRICES]}"
+                        f"⚠️ p1 must be in the action space: {[f'{p:.1f}' for p in prices]}"
                     )
-                if fixed_start_p2 not in PRICES:
+                if fixed_start_p2 not in prices:
                     st.warning(
-                        f"⚠️ p2 must be in the action space: {[f'{p:.1f}' for p in PRICES]}"
+                        f"⚠️ p2 must be in the action space: {[f'{p:.1f}' for p in prices]}"
                     )
         else:
             st.info(

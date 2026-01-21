@@ -66,9 +66,9 @@ def greedy_map(Q):
 
 nash_price = 6
 collusion_price = 8
-marginal_cost = 2.0
-nash_profit = (nash_price - marginal_cost) * demand1(nash_price, nash_price)
-collusion_profit = (collusion_price - marginal_cost) * demand1(
+MARGINAL_COST = 2.0
+nash_profit = (nash_price - MARGINAL_COST) * demand1(nash_price, nash_price)
+collusion_profit = (collusion_price - MARGINAL_COST) * demand1(
     collusion_price, collusion_price
 )
 
@@ -346,7 +346,7 @@ traj_nash = follow_greedy_until_loop(
 
 print("\n--- Cycle stats starting at nash price ---")
 stats_nash = get_cycle_stats(
-    Q1, Q2, start_p1=nash_price, start_p2=nash_price, marginal_cost=marginal_cost
+    Q1, Q2, start_p1=nash_price, start_p2=nash_price, marginal_cost=MARGINAL_COST
 )
 print(stats_nash)
 
@@ -361,6 +361,6 @@ stats_collusion = get_cycle_stats(
     Q2,
     start_p1=collusion_price,
     start_p2=collusion_price,
-    marginal_cost=marginal_cost,
+    marginal_cost=MARGINAL_COST,
 )
 print(stats_collusion)

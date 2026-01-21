@@ -55,7 +55,7 @@ def calculate_prices(
     """Calculate equilibrium price, collusion price, and action space.
 
     Returns:
-        (PRICES list, p_e (equilibrium), p_c (collusion), profit_e (equilibrium profit), profit_c (collusion profit))
+        (prices list, p_e (equilibrium), p_c (collusion), profit_e (equilibrium profit), profit_c (collusion profit))
     """
 
     # Calculate equilibrium price: p_e = (k1 + c) / (2 - k2)
@@ -103,7 +103,7 @@ def flip_q_table_states(Q: np.ndarray, prices: list[float]) -> np.ndarray:
     by swapping p1 and p2 in the state encoding.
 
     Args:
-        Q: Q-table array of shape (N_STATES, N_ACTIONS) where N_STATES = len(prices)^2
+        Q: Q-table array of shape (n_states, n_actions) where n_states = len(prices)^2
         prices: List of price values used to encode states
 
     Returns:
@@ -135,7 +135,7 @@ def argmax_tie(x: np.ndarray, rng: np.random.Generator) -> int:
 
 
 def greedy_map(Q: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """Returns an array of length N_STATES with best-action indices."""
+    """Returns an array of length n_states with best-action indices."""
     n_states = Q.shape[0]
     return np.array([argmax_tie(Q[s_], rng) for s_ in range(n_states)], dtype=int)
 
@@ -161,9 +161,9 @@ def init_session_state_econ(config: dict) -> None:
     n_states = n_actions * n_actions
 
     # Store configuration
-    st.session_state[f"{tab_id}_PRICES"] = prices
-    st.session_state[f"{tab_id}_N_ACTIONS"] = n_actions
-    st.session_state[f"{tab_id}_N_STATES"] = n_states
+    st.session_state[f"{tab_id}_prices"] = prices
+    st.session_state[f"{tab_id}_n_actions"] = n_actions
+    st.session_state[f"{tab_id}_n_states"] = n_states
     # Store config values under cfg_ keys to avoid widget key collisions
     st.session_state[f"{tab_id}_cfg_k1"] = k1
     st.session_state[f"{tab_id}_cfg_k2"] = k2
@@ -203,7 +203,7 @@ def init_session_state_econ(config: dict) -> None:
     if start_mode == "Fixed":
         p1_start = config.get("fixed_start_p1", prices[0])
         p2_start = config.get("fixed_start_p2", prices[0])
-        # Validate prices are in PRICES (round to nearest if close)
+        # Validate prices are in prices (round to nearest if close)
         p1_start = min(prices, key=lambda x: abs(x - p1_start))
         p2_start = min(prices, key=lambda x: abs(x - p2_start))
         starting_prices_picked = True
@@ -268,8 +268,8 @@ def pick_random_starting_prices_econ(config: dict) -> None:
     """Pick random starting prices for randomized mode (tab-scoped)."""
     tab_id = config.get("tab_id", "default")
 
-    # Get PRICES from session state
-    prices = st.session_state.get(f"{tab_id}_PRICES")
+    # Get prices from session state
+    prices = st.session_state.get(f"{tab_id}_prices")
     if not prices:
         return
 
@@ -308,8 +308,8 @@ def step_agent_econ(config: dict) -> None:
         return
 
     # Get configuration
-    prices = st.session_state[f"{tab_id}_PRICES"]
-    n_actions = st.session_state[f"{tab_id}_N_ACTIONS"]
+    prices = st.session_state[f"{tab_id}_prices"]
+    n_actions = st.session_state[f"{tab_id}_n_actions"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
@@ -501,8 +501,8 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
         return
 
     # Get configuration
-    prices = st.session_state[f"{tab_id}_PRICES"]
-    n_actions = st.session_state[f"{tab_id}_N_ACTIONS"]
+    prices = st.session_state[f"{tab_id}_prices"]
+    n_actions = st.session_state[f"{tab_id}_n_actions"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
@@ -633,8 +633,8 @@ def run_until_convergence_econ(config: dict) -> None:
         return
 
     # Get configuration
-    prices = st.session_state[f"{tab_id}_PRICES"]
-    n_actions = st.session_state[f"{tab_id}_N_ACTIONS"]
+    prices = st.session_state[f"{tab_id}_prices"]
+    n_actions = st.session_state[f"{tab_id}_n_actions"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
