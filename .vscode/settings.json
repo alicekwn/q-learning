@@ -18,5 +18,9 @@
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
-    "jupyter.interactiveWindow.textEditor.executeSelection": true
+    "jupyter.interactiveWindow.textEditor.executeSelection": true,
+    "pylint.args": [
+        // "--disable=C0103",
+        "--max-line-length=120"
+    ],
 }

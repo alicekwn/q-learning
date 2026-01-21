@@ -57,6 +57,7 @@ def calculate_prices(
     Returns:
         (PRICES list, p_e (equilibrium), p_c (collusion), profit_e (equilibrium profit), profit_c (collusion profit))
     """
+
     # Calculate equilibrium price: p_e = (k1 + c) / (2 - k2)
     p_e = (k1 + c) / (2 - k2)
 
@@ -74,27 +75,27 @@ def calculate_prices(
     price_end = 2 * p_c - p_e
 
     # Generate m equally spaced points and round to 1 decimal place to avoid floating point precision issues
-    PRICES = np.round(np.linspace(price_start, price_end, m), 3).tolist()
+    price = np.round(np.linspace(price_start, price_end, m), 3).tolist()
 
-    return PRICES, p_e, p_c, profit_e, profit_c
+    return price, p_e, p_c, profit_e, profit_c
 
 
-def state_index(p1: float, p2: float, PRICES: list[float]) -> int:
+def state_index(p1: float, p2: float, prices: list[float]) -> int:
     """Flattens a 2D (p1, p2) into a single row index."""
-    price_to_idx = {p: i for i, p in enumerate(PRICES)}
-    N_ACTIONS = len(PRICES)
-    return price_to_idx[p1] * N_ACTIONS + price_to_idx[p2]
+    price_to_idx = {p: i for i, p in enumerate(prices)}
+    n_actions = len(prices)
+    return price_to_idx[p1] * n_actions + price_to_idx[p2]
 
 
-def index_to_state(s: int, PRICES: list[float]) -> tuple[float, float]:
+def index_to_state(s: int, prices: list[float]) -> tuple[float, float]:
     """Inverse map from index -> (p1, p2)."""
-    N_ACTIONS = len(PRICES)
-    i = s // N_ACTIONS
-    j = s % N_ACTIONS
-    return PRICES[i], PRICES[j]
+    n_actions = len(prices)
+    i = s // n_actions
+    j = s % n_actions
+    return prices[i], prices[j]
 
 
-def flip_q_table_states(Q: np.ndarray, PRICES: list[float]) -> np.ndarray:
+def flip_q_table_states(Q: np.ndarray, prices: list[float]) -> np.ndarray:
     """Flip state indices in a Q-table from s(p1, p2) to s(p2, p1).
 
     This function is used when a Q-table trained from one player's perspective
@@ -102,20 +103,20 @@ def flip_q_table_states(Q: np.ndarray, PRICES: list[float]) -> np.ndarray:
     by swapping p1 and p2 in the state encoding.
 
     Args:
-        Q: Q-table array of shape (N_STATES, N_ACTIONS) where N_STATES = len(PRICES)^2
-        PRICES: List of price values used to encode states
+        Q: Q-table array of shape (N_STATES, N_ACTIONS) where N_STATES = len(prices)^2
+        prices: List of price values used to encode states
 
     Returns:
         A new Q-table with flipped state indices. Q_flipped[s_flipped] = Q[s]
         where s_flipped is the state index for s(p2, p1) when s was for s(p1, p2).
     """
-    N_STATES = Q.shape[0]
+    n_states = Q.shape[0]
     Q_flipped = np.zeros_like(Q)
 
-    for s in range(N_STATES):
-        p1, p2 = index_to_state(s, PRICES)
+    for s in range(n_states):
+        p1, p2 = index_to_state(s, prices)
         # Intentionally swap p1 and p2 to flip state perspective
-        s_flipped = state_index(p1=p2, p2=p1, PRICES=PRICES)
+        s_flipped = state_index(p1=p2, p2=p1, prices=prices)
         Q_flipped[s_flipped] = Q[s]  # Copy Q-values to flipped state
 
     return Q_flipped
@@ -135,8 +136,8 @@ def argmax_tie(x: np.ndarray, rng: np.random.Generator) -> int:
 
 def greedy_map(Q: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Returns an array of length N_STATES with best-action indices."""
-    N_STATES = Q.shape[0]
-    return np.array([argmax_tie(Q[s_], rng) for s_ in range(N_STATES)], dtype=int)
+    n_states = Q.shape[0]
+    return np.array([argmax_tie(Q[s_], rng) for s_ in range(n_states)], dtype=int)
 
 
 # ---------- State Management Functions ----------
@@ -155,14 +156,14 @@ def init_session_state_econ(config: dict) -> None:
     seed = config.get("seed", 43)
 
     # Calculate prices and key prices
-    PRICES, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
-    N_ACTIONS = len(PRICES)
-    N_STATES = N_ACTIONS * N_ACTIONS
+    prices, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
+    n_actions = len(prices)
+    n_states = n_actions * n_actions
 
     # Store configuration
-    st.session_state[f"{tab_id}_PRICES"] = PRICES
-    st.session_state[f"{tab_id}_N_ACTIONS"] = N_ACTIONS
-    st.session_state[f"{tab_id}_N_STATES"] = N_STATES
+    st.session_state[f"{tab_id}_PRICES"] = prices
+    st.session_state[f"{tab_id}_N_ACTIONS"] = n_actions
+    st.session_state[f"{tab_id}_N_STATES"] = n_states
     # Store config values under cfg_ keys to avoid widget key collisions
     st.session_state[f"{tab_id}_cfg_k1"] = k1
     st.session_state[f"{tab_id}_cfg_k2"] = k2
@@ -182,14 +183,14 @@ def init_session_state_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_rng"] = rng
 
     # Initialize Q-tables (both start at zero)
-    Q1 = np.zeros((N_STATES, N_ACTIONS))
-    Q2 = np.zeros((N_STATES, N_ACTIONS))
+    Q1 = np.zeros((n_states, n_actions))
+    Q2 = np.zeros((n_states, n_actions))
     st.session_state[f"{tab_id}_Q1"] = Q1
     st.session_state[f"{tab_id}_Q2"] = Q2
 
     # Create Q-tables as DataFrames for display
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in PRICES for p2 in PRICES]
-    actions = [f"price={p:.1f}" for p in PRICES]
+    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:.1f}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )
@@ -200,11 +201,11 @@ def init_session_state_econ(config: dict) -> None:
     # Pick starting state based on mode
     start_mode = config.get("start_mode", "Randomised")
     if start_mode == "Fixed":
-        p1_start = config.get("fixed_start_p1", PRICES[0])
-        p2_start = config.get("fixed_start_p2", PRICES[0])
+        p1_start = config.get("fixed_start_p1", prices[0])
+        p2_start = config.get("fixed_start_p2", prices[0])
         # Validate prices are in PRICES (round to nearest if close)
-        p1_start = min(PRICES, key=lambda x: abs(x - p1_start))
-        p2_start = min(PRICES, key=lambda x: abs(x - p2_start))
+        p1_start = min(prices, key=lambda x: abs(x - p1_start))
+        p2_start = min(prices, key=lambda x: abs(x - p2_start))
         starting_prices_picked = True
     else:
         # Randomised: don't set starting prices yet - user must click button
@@ -214,7 +215,7 @@ def init_session_state_econ(config: dict) -> None:
 
     # Current state tracking
     if starting_prices_picked:
-        s_start = state_index(p1_start, p2_start, PRICES)
+        s_start = state_index(p1_start, p2_start, prices)
         st.session_state[f"{tab_id}_current_p1"] = p1_start
         st.session_state[f"{tab_id}_current_p2"] = p2_start
         st.session_state[f"{tab_id}_current_state"] = s_start
@@ -268,16 +269,16 @@ def pick_random_starting_prices_econ(config: dict) -> None:
     tab_id = config.get("tab_id", "default")
 
     # Get PRICES from session state
-    PRICES = st.session_state.get(f"{tab_id}_PRICES")
-    if not PRICES:
+    prices = st.session_state.get(f"{tab_id}_PRICES")
+    if not prices:
         return
 
     # Pick random starting prices using np.random.choice directly (not seeded rng) for true randomization
-    p1_start = float(np.random.choice(PRICES))
-    p2_start = float(np.random.choice(PRICES))
+    p1_start = float(np.random.choice(prices))
+    p2_start = float(np.random.choice(prices))
 
     # Set starting state
-    s_start = state_index(p1_start, p2_start, PRICES)
+    s_start = state_index(p1_start, p2_start, prices)
     st.session_state[f"{tab_id}_current_p1"] = p1_start
     st.session_state[f"{tab_id}_current_p2"] = p2_start
     st.session_state[f"{tab_id}_current_state"] = s_start
@@ -307,8 +308,8 @@ def step_agent_econ(config: dict) -> None:
         return
 
     # Get configuration
-    PRICES = st.session_state[f"{tab_id}_PRICES"]
-    N_ACTIONS = st.session_state[f"{tab_id}_N_ACTIONS"]
+    prices = st.session_state[f"{tab_id}_PRICES"]
+    n_actions = st.session_state[f"{tab_id}_N_ACTIONS"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
@@ -319,7 +320,7 @@ def step_agent_econ(config: dict) -> None:
 
     # Get current state
     s = st.session_state[f"{tab_id}_current_state"]
-    p1, p2 = index_to_state(s, PRICES)
+    p1, p2 = index_to_state(s, prices)
 
     # Get Q-tables
     Q1 = st.session_state[f"{tab_id}_Q1"]
@@ -334,23 +335,23 @@ def step_agent_econ(config: dict) -> None:
 
     # ε-greedy action selection for both players
     if rng.random() < eps:
-        a1 = rng.integers(0, N_ACTIONS)
+        a1 = rng.integers(0, n_actions)
         decision_type_1 = "Exploratory (Random)"
     else:
         a1 = argmax_tie(Q1[s], rng)
         decision_type_1 = "Max Value (Greedy)"
 
     if rng.random() < eps:
-        a2 = rng.integers(0, N_ACTIONS)
+        a2 = rng.integers(0, n_actions)
         decision_type_2 = "Exploratory (Random)"
     else:
         a2 = argmax_tie(Q2[s], rng)
         decision_type_2 = "Max Value (Greedy)"
 
     # Compute next state
-    p1_next = PRICES[a1]
-    p2_next = PRICES[a2]
-    s_next = state_index(p1_next, p2_next, PRICES)
+    p1_next = prices[a1]
+    p2_next = prices[a2]
+    s_next = state_index(p1_next, p2_next, prices)
 
     # Calculate demands and profits (rewards)
     q1 = demand1(p1_next, p2_next, k1, k2)
@@ -376,8 +377,8 @@ def step_agent_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_Q2"] = Q2
 
     # Update DataFrame representations
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in PRICES for p2 in PRICES]
-    actions = [f"price={p:.1f}" for p in PRICES]
+    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:.1f}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )
@@ -388,8 +389,8 @@ def step_agent_econ(config: dict) -> None:
     # Find best actions for next state (for display)
     max_next_a1_idx = argmax_tie(Q1[s_next], rng)
     max_next_a2_idx = argmax_tie(Q2[s_next], rng)
-    max_next_p1 = PRICES[max_next_a1_idx]
-    max_next_p2 = PRICES[max_next_a2_idx]
+    max_next_p1 = prices[max_next_a1_idx]
+    max_next_p2 = prices[max_next_a2_idx]
 
     # Log step details for Q1
     eq_str_1 = (
@@ -500,8 +501,8 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
         return
 
     # Get configuration
-    PRICES = st.session_state[f"{tab_id}_PRICES"]
-    N_ACTIONS = st.session_state[f"{tab_id}_N_ACTIONS"]
+    prices = st.session_state[f"{tab_id}_PRICES"]
+    n_actions = st.session_state[f"{tab_id}_N_ACTIONS"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
@@ -531,26 +532,26 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
             break
 
         # Get current prices
-        p1, p2 = index_to_state(s, PRICES)
+        p1, p2 = index_to_state(s, prices)
 
         # Calculate epsilon
         eps = epsilon_at(step_count, beta)
 
         # ε-greedy action selection
         if rng.random() < eps:
-            a1 = rng.integers(0, N_ACTIONS)
+            a1 = rng.integers(0, n_actions)
         else:
             a1 = argmax_tie(Q1[s], rng)
 
         if rng.random() < eps:
-            a2 = rng.integers(0, N_ACTIONS)
+            a2 = rng.integers(0, n_actions)
         else:
             a2 = argmax_tie(Q2[s], rng)
 
         # Compute next state
-        p1_next = PRICES[a1]
-        p2_next = PRICES[a2]
-        s_next = state_index(p1_next, p2_next, PRICES)
+        p1_next = prices[a1]
+        p2_next = prices[a2]
+        s_next = state_index(p1_next, p2_next, prices)
 
         # Calculate profits
         pi1 = profit1(p1_next, p2_next, c, k1, k2)
@@ -593,14 +594,14 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
     st.session_state[f"{tab_id}_Q1"] = Q1
     st.session_state[f"{tab_id}_Q2"] = Q2
     st.session_state[f"{tab_id}_current_state"] = s
-    p1_final, p2_final = index_to_state(s, PRICES)
+    p1_final, p2_final = index_to_state(s, prices)
     st.session_state[f"{tab_id}_current_p1"] = p1_final
     st.session_state[f"{tab_id}_current_p2"] = p2_final
     st.session_state[f"{tab_id}_step_count"] = step_count
 
     # Update DataFrame representations
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in PRICES for p2 in PRICES]
-    actions = [f"price={p:.1f}" for p in PRICES]
+    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:.1f}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )
@@ -632,8 +633,8 @@ def run_until_convergence_econ(config: dict) -> None:
         return
 
     # Get configuration
-    PRICES = st.session_state[f"{tab_id}_PRICES"]
-    N_ACTIONS = st.session_state[f"{tab_id}_N_ACTIONS"]
+    prices = st.session_state[f"{tab_id}_PRICES"]
+    n_actions = st.session_state[f"{tab_id}_N_ACTIONS"]
     k1 = st.session_state[f"{tab_id}_cfg_k1"]
     k2 = st.session_state[f"{tab_id}_cfg_k2"]
     c = st.session_state[f"{tab_id}_cfg_c"]
@@ -659,26 +660,26 @@ def run_until_convergence_econ(config: dict) -> None:
         step_count += 1
 
         # Get current prices
-        p1, p2 = index_to_state(s, PRICES)
+        p1, p2 = index_to_state(s, prices)
 
         # Calculate epsilon
         eps = epsilon_at(step_count, beta)
 
         # ε-greedy action selection
         if rng.random() < eps:
-            a1 = rng.integers(0, N_ACTIONS)
+            a1 = rng.integers(0, n_actions)
         else:
             a1 = argmax_tie(Q1[s], rng)
 
         if rng.random() < eps:
-            a2 = rng.integers(0, N_ACTIONS)
+            a2 = rng.integers(0, n_actions)
         else:
             a2 = argmax_tie(Q2[s], rng)
 
         # Compute next state
-        p1_next = PRICES[a1]
-        p2_next = PRICES[a2]
-        s_next = state_index(p1_next, p2_next, PRICES)
+        p1_next = prices[a1]
+        p2_next = prices[a2]
+        s_next = state_index(p1_next, p2_next, prices)
 
         # Calculate profits
         pi1 = profit1(p1_next, p2_next, c, k1, k2)
@@ -730,14 +731,14 @@ def run_until_convergence_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_Q1"] = Q1
     st.session_state[f"{tab_id}_Q2"] = Q2
     st.session_state[f"{tab_id}_current_state"] = s
-    p1_final, p2_final = index_to_state(s, PRICES)
+    p1_final, p2_final = index_to_state(s, prices)
     st.session_state[f"{tab_id}_current_p1"] = p1_final
     st.session_state[f"{tab_id}_current_p2"] = p2_final
     st.session_state[f"{tab_id}_step_count"] = step_count
 
     # Update DataFrame representations
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in PRICES for p2 in PRICES]
-    actions = [f"price={p:.1f}" for p in PRICES]
+    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:.1f}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )

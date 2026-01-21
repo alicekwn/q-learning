@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import Dict, Protocol, Tuple, TypeVar, Any, Hashable
+import random
 
 # Type variables for generic state and action types
 State = TypeVar("State", bound=Hashable)
@@ -72,8 +73,6 @@ class QLearningAgent:
         if self.env.is_terminal(state):
             return None
         eps = 0.0 if eval_mode else self.epsilon
-
-        import random
 
         actions = self._get_actions()
         if random.random() < eps:

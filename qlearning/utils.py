@@ -1,4 +1,5 @@
 """Helper utilities"""
+
 from __future__ import annotations
 
 from typing import Dict, List
@@ -37,4 +38,3 @@ def plot_q_evolution(records: List[Dict[str, float]]) -> None:
     plt.legend()
     plt.tight_layout()
     plt.show()
-
