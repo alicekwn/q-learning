@@ -41,7 +41,7 @@ st.info(
     "This page demonstrates Q-learning applied to economics pricing with two players learning optimal pricing strategies."
 )
 
-tab_1, tab_2, tab_3 = st.tabs(["Game Theory", "Demo", "Pricing Battle"])
+tab_1, tab_2, tab_3 = st.tabs(["Game Theory", "Training", "Pricing Battle"])
 
 with tab_1:
     st.markdown(
@@ -101,14 +101,14 @@ with tab_1:
 
 with tab_2:
 
-    st.header("Demo of Q-value update in Economics Pricing Scenario")
+    st.header("Training of Q-value update in Economics Pricing Scenario")
     st.markdown(
         "This section demonstrates how the Q-value updates in this economics pricing scenario. "
         "You can step through the training process and observe how both players learn optimal pricing strategies."
     )
 
     # --- A. TOP PANEL: Controls ---
-    config_demo = parameters_econ("demo")
+    config_demo = parameters_econ("training")
 
     # Reset button
     col_reset, col_spacer = st.columns([1, 5])
@@ -125,7 +125,7 @@ with tab_2:
     st.markdown("---")
 
     # Initialize on first load
-    if "demo_Q1" not in st.session_state:
+    if f"{config_demo.get('tab_id', 'training')}_Q1" not in st.session_state:
         init_session_state_econ(config_demo)
 
     display_state = get_display_state_econ(config_demo)
