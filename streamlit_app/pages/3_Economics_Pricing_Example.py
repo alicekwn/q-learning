@@ -1,18 +1,11 @@
 """Economics Pricing Example with Q-learning"""
 
 from __future__ import annotations
-
 import sys
 from pathlib import Path
-
 import numpy as np
 import streamlit as st
 import pandas as pd
-
-ROOT = Path(__file__).resolve().parent.parent.parent  # project root
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-
 from streamlit_app.ui.controls import parameters_econ
 from streamlit_app.ui.training import render_training_controls_econ
 from streamlit_app.ui.bellman import render_bellman_log_econ
@@ -33,6 +26,10 @@ from streamlit_app.state_econ import (
     demand1,
     flip_q_table_states,
 )
+
+ROOT = Path(__file__).resolve().parent.parent.parent  # project root
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 st.set_page_config(page_title="Pricing Strategies in Economics", layout="wide")
 

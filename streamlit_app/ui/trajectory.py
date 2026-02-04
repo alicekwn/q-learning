@@ -1,10 +1,8 @@
 """Trajectory computation and display for Economics Pricing Q-learning demo."""
 
 from __future__ import annotations
-
 import numpy as np
 import streamlit as st
-
 from streamlit_app.state_econ import (
     profit1,
     profit2,
