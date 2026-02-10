@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+
+# Ensure project root (containing `streamlit_app`) is on sys.path
+ROOT = Path(__file__).resolve().parent.parent.parent  # project root
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
 import streamlit as st
 from streamlit_app.ui.controls import parameters_1d, parameters_2d
 from streamlit_app.ui.training import render_training_controls
@@ -26,10 +32,6 @@ from streamlit_app.state import (
 from streamlit_app.ui.training import playback_indicator
 
 st.set_page_config(page_title="The Dog & The Bone – Q-Learning", layout="wide")
-
-ROOT = Path(__file__).resolve().parent.parent.parent  # project root
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
 
 st.title("The Dog & The Bone")
 

@@ -3,6 +3,12 @@
 from __future__ import annotations
 import sys
 from pathlib import Path
+
+# Ensure project root (containing `streamlit_app`) is on sys.path
+ROOT = Path(__file__).resolve().parent.parent.parent  # project root
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
 import numpy as np
 import streamlit as st
 import pandas as pd
@@ -26,10 +32,6 @@ from streamlit_app.state_econ import (
     demand1,
     flip_q_table_states,
 )
-
-ROOT = Path(__file__).resolve().parent.parent.parent  # project root
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
 
 st.set_page_config(page_title="Pricing Strategies in Economics", layout="wide")
 
