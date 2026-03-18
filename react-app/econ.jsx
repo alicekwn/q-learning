@@ -811,18 +811,21 @@ self.onmessage=function(e){
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Action Space Size m</Label>
-                                        <Input
-                                            type="number"
-                                            step="1"
+                                        <select
+                                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                             value={m}
                                             onChange={(e) => {
                                                 const v = Number(e.target.value);
                                                 if (Number.isNaN(v)) return;
-                                                const allowed = [4, 7, 10, 13, 16];
-                                                const closest = allowed.reduce((best, cur) => (Math.abs(cur - v) < Math.abs(best - v) ? cur : best), 7);
-                                                setM(closest);
+                                                setM(v);
                                             }}
-                                        />
+                                        >
+                                            {[4, 7, 10, 13, 16].map((option) => (
+                                                <option key={option} value={option}>
+                                                    {option}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
 

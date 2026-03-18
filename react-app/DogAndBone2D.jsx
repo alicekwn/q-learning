@@ -17,7 +17,6 @@ const ACTIONS = [
 function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v));
 }
-
 function formatNum(x) {
     return Number.isFinite(x) ? x.toFixed(2) : "0.00";
 }
@@ -414,8 +413,7 @@ export default function QLearningDogBoneDemo2D() {
     const [gamma, setGamma] = useState(0.9);
     const [epsilon, setEpsilon] = useState(0.2);
     const [rewardValue, setRewardValue] = useState(10);
-    const [randomStartEachEpisode, setRandomStartEachEpisode] = useState(true);
-    const [trainEpisodes, setTrainEpisodes] = useState(100);
+    const [randomStartEachEpisode, setRandomStartEachEpisode] = useState(false);
     const [autoplay, setAutoplay] = useState(false);
     const [appliedConfig, setAppliedConfig] = useState({
         xMin: 0,
@@ -430,7 +428,7 @@ export default function QLearningDogBoneDemo2D() {
         gamma: 0.9,
         epsilon: 0.2,
         rewardValue: 10,
-        randomStartEachEpisode: true,
+        randomStartEachEpisode: false,
     });
 
     const autoplayRef = useRef(null);
@@ -735,14 +733,12 @@ export default function QLearningDogBoneDemo2D() {
                                     <Button variant="outline" onClick={resetEpisode}><RotateCcw className="mr-2 h-4 w-4" />Reset Episode</Button>
                                     <Button variant="outline" onClick={resetAll}>Full Reset</Button>
                                     <Button onClick={stepEpisode}><StepForward className="mr-2 h-4 w-4" />Step</Button>
+                                    <Button variant="secondary" onClick={() => trainBatch(10)}><FastForward className="mr-2 h-4 w-4" />Train 10</Button>
+                                    <Button variant="secondary" onClick={() => trainBatch(100)}>Train 100</Button>
                                     <Button variant={autoplay ? "destructive" : "default"} onClick={() => setAutoplay((v) => !v)}>
                                         {autoplay ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
                                         {autoplay ? "Stop" : "Autoplay"}
                                     </Button>
-                                    <div className="col-span-2 flex gap-2">
-                                        <Input type="number" min={1} value={trainEpisodes} onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && v >= 1) setTrainEpisodes(v); }} className="w-24" />
-                                        <Button variant="secondary" className="flex-1" onClick={() => trainBatch(trainEpisodes)}><FastForward className="mr-2 h-4 w-4" />Train</Button>
-                                    </div>
                                 </div>
 
                                 <div className="rounded-xl border p-3">
@@ -765,6 +761,24 @@ export default function QLearningDogBoneDemo2D() {
                                     </div>
                                 </div>
 
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div className="rounded-xl border p-3">
+                                        <div className="text-slate-500">Completed Episodes</div>
+                                        <div className="text-2xl font-bold">{completedEpisodes}</div>
+                                    </div>
+                                    <div className="rounded-xl border p-3">
+                                        <div className="text-slate-500">Current Episode</div>
+                                        <div className="text-2xl font-bold">{currentEpisodeNumber}</div>
+                                    </div>
+                                    <div className="rounded-xl border p-3">
+                                        <div className="text-slate-500">Steps This Episode</div>
+                                        <div className="text-2xl font-bold">{stepCount}</div>
+                                    </div>
+                                    <div className="rounded-xl border p-3">
+                                        <div className="text-slate-500">Average Steps</div>
+                                        <div className="text-2xl font-bold">{stepsPerEpisode.length ? (stepsPerEpisode.reduce((a, b) => a + b, 0) / stepsPerEpisode.length).toFixed(1) : "0.0"}</div>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
